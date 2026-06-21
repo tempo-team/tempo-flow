@@ -1,0 +1,15 @@
+{
+  "name": "@tempo-flow/eslint-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared ESLint flat config for the tempo-flow monorepo",
+  "license": "Apache-2.0",
+  "exports": {
+    "./base": "./base.mjs"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.17.0",
+    "typescript-eslint": "^8.18.1"
+  }
+}

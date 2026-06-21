@@ -1,0 +1,104 @@
+# Copyright 2026 The tempo-flow Authors
+# SPDX-License-Identifier: Apache-2.0
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: typecheck + lint + test + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.8.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # postinstall runs `set-db-provider` + `prisma generate` (no DB needed).
+      - run: pnpm install --frozen-lockfile
+
+      - name: Validate Prisma schema
+        run: pnpm prisma validate
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build
+
+  migrations-matrix:
+    name: Prisma migrations (${{ matrix.provider }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [postgresql, mysql, sqlite]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tempo
+          POSTGRES_PASSWORD: tempo
+          POSTGRES_DB: tempo_flow
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tempo" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: tempo
+          MYSQL_DATABASE: tempo_flow
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -ptempo" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations + seed
+        env:
+          DATABASE_PROVIDER: ${{ matrix.provider }}
+          DATABASE_URL: >-
+            ${{ matrix.provider == 'postgresql' && 'postgresql://tempo:tempo@localhost:5432/tempo_flow?schema=public'
+            || matrix.provider == 'mysql' && 'mysql://root:tempo@localhost:3306/tempo_flow'
+            || 'file:./ci.db' }}
+        run: |
+          node scripts/set-db-provider.mjs "$DATABASE_PROVIDER"
+          pnpm prisma generate
+          # SQLite/MySQL migration SQL differs from the committed Postgres
+          # migration, so push the schema for the non-default providers.
+          if [ "$DATABASE_PROVIDER" = "postgresql" ]; then
+            pnpm prisma migrate deploy
+          else
+            pnpm prisma db push --skip-generate --accept-data-loss
+          fi
+          pnpm tsx prisma/seed.ts

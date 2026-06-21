@@ -1,0 +1,125 @@
+// Copyright 2026 The tempo-flow Authors
+// SPDX-License-Identifier: Apache-2.0
+//
+// Multi-DB schema. The datasource provider is swapped by
+// scripts/set-db-provider.mjs (driven by DATABASE_PROVIDER) so the same schema
+// runs on PostgreSQL (default), MySQL, and SQLite.
+//
+// To stay portable across all three providers we deliberately avoid native
+// `Json` and `enum` types (SQLite supports neither): JSON payloads are stored
+// as `String` and (de)serialized via packages/shared-types json helpers, and
+// status/role values are plain strings validated in application code.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // DB_PROVIDER (managed by scripts/set-db-provider.mjs)
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String?
+  active       Boolean    @default(true)
+  roles        UserRole[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  flows        Flow[]     @relation("FlowCreatedBy")
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  users       UserRole[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+}
+
+model Permission {
+  id       String           @id @default(cuid())
+  action   String
+  resource String
+  roles    RolePermission[]
+
+  @@unique([action, resource])
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model Flow {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  definition    String    // DAG JSON: { nodes[], edges[] } — workflow-as-data
+  trigger       String    // JSON: { type: "cron"|"manual", expr?: string }
+  enabled       Boolean   @default(true)
+  overlapPolicy String    @default("skip") // "skip" | "allow"
+  createdBy     String
+  creator       User      @relation("FlowCreatedBy", fields: [createdBy], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  runs          FlowRun[]
+
+  @@index([enabled])
+}
+
+model FlowRun {
+  id         String    @id @default(cuid())
+  flowId     String
+  flow       Flow      @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  status     String    // PENDING | RUNNING | SUCCESS | FAILED | CANCELED
+  trigger    String    // "schedule" | "manual"
+  params     String?   // JSON: resolved params (date substitution applied)
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+  nodeRuns   NodeRun[]
+
+  @@index([flowId, status])
+  @@index([startedAt])
+}
+
+model NodeRun {
+  id           String    @id @default(cuid())
+  flowRunId    String
+  flowRun      FlowRun   @relation(fields: [flowRunId], references: [id], onDelete: Cascade)
+  nodeId       String    // node id within the DAG
+  status       String    // PENDING | RUNNING | SUCCESS | FAILED | CANCELED
+  attempt      Int       @default(0)
+  executor     String    // "http" | "k8s"
+  request      String?   // JSON: actual request (query/body/env)
+  response     String?   // JSON: response / exit code / log summary
+  errorMessage String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+
+  @@index([flowRunId])
+}
+
+model SystemSetting {
+  key   String @id
+  value String // JSON payload (e.g. notification channel config, encrypted secrets)
+}

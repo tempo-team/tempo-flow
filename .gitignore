@@ -1,0 +1,23 @@
+node_modules/
+dist/
+build/
+.turbo/
+coverage/
+*.log
+.env
+.env.local
+.DS_Store
+*.tsbuildinfo
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# editor
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# local-only working dirs (not part of the OSS repo)
+thoughts/
+.claude/

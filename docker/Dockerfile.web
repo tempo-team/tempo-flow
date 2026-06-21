@@ -1,0 +1,24 @@
+# Copyright 2026 The tempo-flow Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Web image: builds the Vite SPA and serves it via nginx, proxying /api + /health
+# to the api service.
+
+FROM node:20-slim AS build
+ENV HUSKY=0
+RUN corepack enable
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY scripts ./scripts
+COPY prisma ./prisma
+COPY packages ./packages
+# All workspace projects must be present for `pnpm install --frozen-lockfile`.
+COPY apps ./apps
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @tempo-flow/shared-types build \
+ && pnpm --filter @tempo-flow/web build
+
+FROM nginx:1.27-alpine AS run
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+EXPOSE 80

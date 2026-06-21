@@ -1,0 +1,31 @@
+# Copyright 2026 The tempo-flow Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# API + worker image (the worker runs in-process or as a separate replica of
+# this same image with WORKER_ENABLED=true).
+
+FROM node:20-slim AS base
+ENV HUSKY=0
+RUN corepack enable && apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+
+FROM base AS build
+# Workspace manifests first (better layer caching).
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY scripts ./scripts
+COPY prisma ./prisma
+COPY docker ./docker
+COPY packages ./packages
+# All workspace projects must be present for `pnpm install --frozen-lockfile`
+# (pnpm-workspace.yaml globs apps/* + packages/*).
+COPY apps ./apps
+# postinstall runs set-db-provider + prisma generate (needs scripts/ + prisma/).
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @tempo-flow/shared-types --filter @tempo-flow/flow-engine --filter @tempo-flow/executors build \
+ && pnpm --filter @tempo-flow/api build
+
+FROM base AS run
+COPY --from=build /app ./
+ENV NODE_ENV=production
+EXPOSE 3000
+ENTRYPOINT ["sh", "docker/entrypoint.sh"]
