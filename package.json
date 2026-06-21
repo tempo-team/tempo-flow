@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "packageManager": "pnpm@11.8.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
     "postinstall": "node scripts/set-db-provider.mjs && prisma generate",

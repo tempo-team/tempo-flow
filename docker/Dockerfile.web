@@ -4,7 +4,7 @@
 # Web image: builds the Vite SPA and serves it via nginx, proxying /api + /health
 # to the api service.
 
-FROM node:20-slim AS build
+FROM node:24-slim AS build
 ENV HUSKY=0
 RUN corepack enable
 WORKDIR /app
