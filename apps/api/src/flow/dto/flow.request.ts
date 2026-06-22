@@ -42,6 +42,16 @@ export class CreateFlowRequest {
   @IsInt()
   @Min(0)
   slaMs?: number
+
+  @IsOptional()
+  @IsBoolean()
+  requiresApproval?: boolean
+}
+
+export class ImportFlowRequest {
+  @IsString()
+  @MinLength(1)
+  yaml!: string
 }
 
 export class UpdateFlowRequest {
@@ -74,4 +84,8 @@ export class UpdateFlowRequest {
   @IsInt()
   @Min(0)
   slaMs?: number
+
+  @IsOptional()
+  @IsBoolean()
+  requiresApproval?: boolean
 }

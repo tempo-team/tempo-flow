@@ -6,6 +6,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   Param,
   Patch,
@@ -17,7 +18,7 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard"
 import { CurrentUser } from "../authz/current-user.decorator"
 import { PermissionsGuard } from "../authz/permissions.guard"
 import { RequirePermission } from "../authz/require-permission.decorator"
-import { CreateFlowRequest, UpdateFlowRequest } from "./dto/flow.request"
+import { CreateFlowRequest, ImportFlowRequest, UpdateFlowRequest } from "./dto/flow.request"
 import { FlowResponse } from "./dto/flow.response"
 import { FlowService } from "./flow.service"
 
@@ -63,6 +64,22 @@ export class FlowController {
   @HttpCode(204)
   async remove(@Param("id") id: string): Promise<void> {
     await this.flows.remove(id)
+  }
+
+  @Get(":id/export")
+  @RequirePermission(Action.View, Resource.Flow)
+  @Header("content-type", "application/x-yaml")
+  export(@Param("id") id: string): Promise<string> {
+    return this.flows.exportYaml(id)
+  }
+
+  @Post("import")
+  @RequirePermission(Action.Edit, Resource.Flow)
+  async import(
+    @Body() body: ImportFlowRequest,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<FlowResponse> {
+    return FlowResponse.from(await this.flows.importYaml(body.yaml, user.userId))
   }
 
   @Get(":id/versions")

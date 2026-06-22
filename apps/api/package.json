@@ -33,6 +33,7 @@
     "croner": "^10.0.1",
     "grammy": "^1.44.0",
     "ioredis": "^5.11.1",
+    "js-yaml": "^5.0.0",
     "nodemailer": "^9.0.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
@@ -44,6 +45,7 @@
     "@nestjs/cli": "^10.4.9",
     "@nestjs/schematics": "^10.2.3",
     "@types/express": "^5.0.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/nodemailer": "^8.0.1",
     "@types/passport-jwt": "^4.0.1",
     "prisma": "^6.19.3"

@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Background, Controls, ReactFlow } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { ArrowLeft, CalendarRange, Pencil, Play, Trash2 } from "lucide-react"
+import { ArrowLeft, CalendarRange, Download, Pencil, Play, Trash2 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
@@ -62,6 +62,21 @@ export function FlowPage() {
     if (event.kind === "run.status" && event.flowId === id) reloadRuns()
   })
 
+  async function exportYaml(): Promise<void> {
+    if (!flow) return
+    try {
+      const yaml = await api.exportFlowYaml(flow.id)
+      const url = URL.createObjectURL(new Blob([yaml], { type: "application/x-yaml" }))
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${flow.name}.yaml`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      toast.error("Export failed", { description: (e as Error).message })
+    }
+  }
+
   const graph = useMemo(() => (flow ? toReactFlow(flow.definition) : null), [flow])
 
   if (!flow || !graph) return <div className="p-6 text-muted-foreground">Loading…</div>
@@ -105,6 +120,9 @@ export function FlowPage() {
               <Pencil className="mr-2 size-4" /> Edit
             </Button>
           )}
+          <Button variant="outline" size="icon" onClick={exportYaml} title="Export YAML">
+            <Download className="size-4" />
+          </Button>
           {can("edit", "flow") && (
             <Button variant="outline" size="icon" onClick={() => setToDelete(flow)}>
               <Trash2 className="size-4 text-destructive" />

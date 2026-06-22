@@ -12,6 +12,7 @@ interface FlowRow {
   enabled: boolean
   overlapPolicy: string
   slaMs: number | null
+  requiresApproval: boolean
   createdBy: string
   createdAt: Date
   updatedAt: Date
@@ -26,6 +27,7 @@ export class FlowResponse {
   enabled!: boolean
   overlapPolicy!: string
   slaMs!: number | null
+  requiresApproval!: boolean
   createdBy!: string
   createdAt!: string
   updatedAt!: string
@@ -40,6 +42,7 @@ export class FlowResponse {
       enabled: flow.enabled,
       overlapPolicy: flow.overlapPolicy,
       slaMs: flow.slaMs,
+      requiresApproval: flow.requiresApproval,
       createdBy: flow.createdBy,
       createdAt: flow.createdAt.toISOString(),
       updatedAt: flow.updatedAt.toISOString(),

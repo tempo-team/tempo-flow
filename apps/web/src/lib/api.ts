@@ -186,6 +186,15 @@ export const api = {
   updateFlow: (id: string, body: Partial<FlowPayload>) =>
     request<FlowSummary>(`/flows/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteFlow: (id: string) => request<void>(`/flows/${id}`, { method: "DELETE" }),
+  exportFlowYaml: async (id: string): Promise<string> => {
+    const res = await fetch(`${BASE}/flows/${id}/export`, {
+      headers: { authorization: `Bearer ${getToken() ?? ""}` },
+    })
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`)
+    return res.text()
+  },
+  importFlow: (yaml: string) =>
+    request<FlowSummary>("/flows/import", { method: "POST", body: JSON.stringify({ yaml }) }),
   listVersions: (id: string) => request<FlowVersion[]>(`/flows/${id}/versions`),
   restoreVersion: (id: string, version: number) =>
     request<FlowSummary>(`/flows/${id}/versions/${version}/restore`, { method: "POST" }),

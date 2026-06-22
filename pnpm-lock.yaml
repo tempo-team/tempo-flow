@@ -134,6 +134,9 @@ importers:
       ioredis:
         specifier: ^5.11.1
         version: 5.11.1
+      js-yaml:
+        specifier: ^5.0.0
+        version: 5.0.0
       nodemailer:
         specifier: ^9.0.1
         version: 9.0.1
@@ -162,6 +165,9 @@ importers:
       "@types/express":
         specifier: ^5.0.0
         version: 5.0.6
+      "@types/js-yaml":
+        specifier: ^4.0.9
+        version: 4.0.9
       "@types/nodemailer":
         specifier: ^8.0.1
         version: 8.0.1
@@ -5740,6 +5746,13 @@ packages:
     resolution:
       {
         integrity: sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==,
+      }
+    hasBin: true
+
+  js-yaml@5.0.0:
+    resolution:
+      {
+        integrity: sha512-GSvaPUbk1U+FMZ7rJzF+F8e5YVtu7KnD40et/5rBXXRBv2jCO9L3qCewvIDDdudC0QycTFlf6EAA+h3kxBsuUw==,
       }
     hasBin: true
 
@@ -11768,6 +11781,10 @@ snapshots:
   js-tokens@4.0.0: {}
 
   js-yaml@4.2.0:
+    dependencies:
+      argparse: 2.0.1
+
+  js-yaml@5.0.0:
     dependencies:
       argparse: 2.0.1
 

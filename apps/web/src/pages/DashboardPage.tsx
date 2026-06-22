@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useEffect, useState } from "react"
-import { MoreHorizontal, Pencil, Play, Plus, Trash2, Workflow } from "lucide-react"
+import { MoreHorizontal, Pencil, Play, Plus, Trash2, Upload, Workflow } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { DeleteFlowDialog } from "@/features/flows/DeleteFlowDialog"
+import { ImportFlowDialog } from "@/features/flows/ImportFlowDialog"
 import { type FlowSummary, api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
@@ -62,9 +63,16 @@ export function DashboardPage() {
           <p className="text-sm text-muted-foreground">Register, schedule, and run batch flows.</p>
         </div>
         {canEdit && (
-          <Button onClick={() => navigate("/flows/new")}>
-            <Plus className="mr-2 size-4" /> New flow
-          </Button>
+          <div className="flex gap-2">
+            <ImportFlowDialog>
+              <Button variant="outline">
+                <Upload className="mr-2 size-4" /> Import
+              </Button>
+            </ImportFlowDialog>
+            <Button onClick={() => navigate("/flows/new")}>
+              <Plus className="mr-2 size-4" /> New flow
+            </Button>
+          </div>
         )}
       </div>
 

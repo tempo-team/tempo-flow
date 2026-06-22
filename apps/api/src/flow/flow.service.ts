@@ -3,7 +3,8 @@
 
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
 import { validateFlowDefinition, validateFlowTrigger } from "@tempo-flow/flow-engine"
-import { toJson } from "@tempo-flow/shared-types"
+import { type FlowDefinition, type FlowTrigger, fromJson, toJson } from "@tempo-flow/shared-types"
+import { dump, load } from "js-yaml"
 import { PrismaService } from "../prisma/prisma.service"
 import { SchedulerService } from "../scheduler/scheduler.service"
 import type { CreateFlowRequest, UpdateFlowRequest } from "./dto/flow.request"
@@ -36,6 +37,7 @@ export class FlowService {
         enabled: input.enabled ?? true,
         overlapPolicy: input.overlapPolicy ?? "skip",
         slaMs: input.slaMs ?? null,
+        requiresApproval: input.requiresApproval ?? false,
         createdBy: userId,
       },
     })
@@ -62,6 +64,7 @@ export class FlowService {
     if (input.enabled !== undefined) data.enabled = input.enabled
     if (input.overlapPolicy !== undefined) data.overlapPolicy = input.overlapPolicy
     if (input.slaMs !== undefined) data.slaMs = input.slaMs
+    if (input.requiresApproval !== undefined) data.requiresApproval = input.requiresApproval
     const flow = await this.prisma.flow.update({ where: { id }, data })
     this.scheduler.register(flow)
     return flow
@@ -131,6 +134,49 @@ export class FlowService {
         createdBy: userId,
       },
     })
+  }
+
+  // --- YAML import / export ---
+
+  /** Serialize a flow to portable YAML (no ids/timestamps). */
+  async exportYaml(id: string): Promise<string> {
+    const flow = await this.get(id)
+    return dump({
+      name: flow.name,
+      description: flow.description ?? undefined,
+      enabled: flow.enabled,
+      overlapPolicy: flow.overlapPolicy,
+      slaMs: flow.slaMs ?? undefined,
+      requiresApproval: flow.requiresApproval,
+      trigger: fromJson<FlowTrigger>(flow.trigger, { type: "manual" }),
+      definition: fromJson<FlowDefinition>(flow.definition, { nodes: [], edges: [] }),
+    })
+  }
+
+  /** Parse a YAML document and create a flow (validated like a normal create). */
+  async importYaml(yaml: string, userId: string) {
+    let parsed: Record<string, unknown>
+    try {
+      parsed = load(yaml) as Record<string, unknown>
+    } catch (err) {
+      throw new BadRequestException(`Invalid YAML: ${(err as Error).message}`)
+    }
+    if (!parsed || typeof parsed !== "object" || !parsed.name || !parsed.definition) {
+      throw new BadRequestException("YAML must include at least name and definition")
+    }
+    return this.create(
+      {
+        name: String(parsed.name),
+        description: parsed.description ? String(parsed.description) : undefined,
+        definition: parsed.definition as FlowDefinition,
+        trigger: (parsed.trigger as FlowTrigger) ?? { type: "manual" },
+        enabled: parsed.enabled as boolean | undefined,
+        overlapPolicy: parsed.overlapPolicy as "skip" | "allow" | undefined,
+        slaMs: parsed.slaMs as number | undefined,
+        requiresApproval: parsed.requiresApproval as boolean | undefined,
+      },
+      userId,
+    )
   }
 
   private async parseExisting(id: string) {
