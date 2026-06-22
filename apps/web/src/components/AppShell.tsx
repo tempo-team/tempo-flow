@@ -3,7 +3,7 @@
 
 import { type ReactNode, useState } from "react"
 import { LogOut, Menu, Settings, Users, Workflow } from "lucide-react"
-import { NavLink, useNavigate } from "react-router-dom"
+import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,38 +23,53 @@ interface NavItem {
   label: string
   icon: typeof Workflow
   show: boolean
+  /** Prefix that also counts as active (e.g. /flows/:id highlights Flows). */
+  activePrefix: string
 }
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { can } = useAuth()
+  const { pathname } = useLocation()
   const items: NavItem[] = [
-    { to: "/", label: "Flows", icon: Workflow, show: true },
-    { to: "/members", label: "Members", icon: Users, show: can("manage", "user") },
-    { to: "/settings", label: "Settings", icon: Settings, show: can("view", "setting") },
+    { to: "/", label: "Flows", icon: Workflow, show: true, activePrefix: "/flows" },
+    {
+      to: "/members",
+      label: "Members",
+      icon: Users,
+      show: can("manage", "user"),
+      activePrefix: "/members",
+    },
+    {
+      to: "/settings",
+      label: "Settings",
+      icon: Settings,
+      show: can("view", "setting"),
+      activePrefix: "/settings",
+    },
   ]
   return (
     <nav className="flex flex-col gap-1">
       {items
         .filter((i) => i.show)
-        .map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === "/"}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              cn(
+        .map((item) => {
+          const active = pathname === item.to || pathname.startsWith(item.activePrefix)
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={onNavigate}
+              className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                isActive
+                active
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-              )
-            }
-          >
-            <item.icon className="size-4" />
-            {item.label}
-          </NavLink>
-        ))}
+              )}
+            >
+              <item.icon className="size-4" />
+              {item.label}
+            </NavLink>
+          )
+        })}
     </nav>
   )
 }

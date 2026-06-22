@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { NodeForm } from "./NodeForm"
-import { newEdge, newNode } from "./state"
+import { newEdge, newNode, updateNodeInDef } from "./state"
 
 interface Props {
   definition: FlowDefinition
@@ -24,7 +24,7 @@ const CONDITIONS: EdgeCondition[] = ["success", "failure", "always"]
 
 export function FormMode({ definition, onChange }: Props) {
   function setNode(index: number, next: FlowNode): void {
-    onChange({ ...definition, nodes: definition.nodes.map((n, i) => (i === index ? next : n)) })
+    onChange(updateNodeInDef(definition, definition.nodes[index].id, next))
   }
   function addNode(): void {
     onChange({ ...definition, nodes: [...definition.nodes, newNode(definition)] })

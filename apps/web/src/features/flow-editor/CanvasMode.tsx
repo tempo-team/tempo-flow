@@ -30,7 +30,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { type FlowNodeData, layout, toReactFlow } from "@/lib/flow-graph"
 import { NodeForm } from "./NodeForm"
-import { newEdge, newNode } from "./state"
+import { newEdge, newNode, updateNodeInDef } from "./state"
 
 interface Props {
   definition: FlowDefinition
@@ -92,6 +92,11 @@ export function CanvasMode({ definition, onChange }: Props) {
   const onConnect = useCallback(
     (conn: Connection) => {
       if (!conn.source || !conn.target) return
+      // Skip duplicates (same source → target on the same condition).
+      const exists = definition.edges.some(
+        (e) => e.source === conn.source && e.target === conn.target && e.on === "success",
+      )
+      if (exists) return
       const edge = newEdge(conn.source, conn.target, "success")
       setEdges((eds) => addEdge({ ...conn, id: edge.id, label: "success" }, eds))
       onChange({ ...definition, edges: [...definition.edges, edge] })
@@ -110,10 +115,8 @@ export function CanvasMode({ definition, onChange }: Props) {
   const selected = definition.nodes.find((n) => n.id === selectedNode) ?? null
 
   function updateNode(next: FlowNode): void {
-    onChange({
-      ...definition,
-      nodes: definition.nodes.map((n) => (n.id === selectedNode ? next : n)),
-    })
+    if (!selectedNode) return
+    onChange(updateNodeInDef(definition, selectedNode, next))
     if (next.id !== selectedNode) setSelectedNode(next.id)
   }
 

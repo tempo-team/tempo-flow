@@ -1,6 +1,7 @@
 // Copyright 2026 The tempo-flow Authors
 // SPDX-License-Identifier: Apache-2.0
 
+import { useState } from "react"
 import { Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +14,20 @@ interface Props {
   valuePlaceholder?: string
 }
 
-/** Edit a string→string map as a list of key/value rows. */
+interface Row {
+  id: number
+  k: string
+  v: string
+}
+
+/**
+ * Edit a string→string map. Rows are held in local state with stable ids so
+ * blank rows and in-progress duplicate keys can coexist while typing (the map
+ * representation alone would collapse them). Only non-empty keys are emitted.
+ *
+ * Local state is seeded once on mount, so the parent must remount this editor
+ * (via a `key`) when it swaps to a different underlying object.
+ */
 export function KeyValueEditor({
   label,
   value,
@@ -21,18 +35,34 @@ export function KeyValueEditor({
   keyPlaceholder = "key",
   valuePlaceholder = "value",
 }: Props) {
-  const entries = Object.entries(value)
+  const [rows, setRows] = useState<Row[]>(() =>
+    Object.entries(value).map(([k, v], i) => ({ id: i, k, v })),
+  )
+  const [nextId, setNextId] = useState(rows.length)
 
-  function update(index: number, k: string, v: string): void {
-    const next = entries.map((e, i) => (i === index ? [k, v] : e))
-    onChange(Object.fromEntries(next))
+  function commit(next: Row[]): void {
+    setRows(next)
+    const out: Record<string, string> = {}
+    for (const r of next) if (r.k !== "") out[r.k] = r.v
+    onChange(out)
   }
-  function remove(index: number): void {
-    onChange(Object.fromEntries(entries.filter((_, i) => i !== index)))
+  function update(id: number, patch: Partial<Row>): void {
+    commit(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  }
+  function remove(id: number): void {
+    commit(rows.filter((r) => r.id !== id))
   }
   function add(): void {
-    onChange({ ...value, "": "" })
+    setRows([...rows, { id: nextId, k: "", v: "" }])
+    setNextId(nextId + 1)
   }
+
+  const dupes = new Set(
+    rows
+      .filter((r) => r.k !== "")
+      .map((r) => r.k)
+      .filter((k, i, a) => a.indexOf(k) !== i),
+  )
 
   return (
     <div className="space-y-2">
@@ -42,26 +72,30 @@ export function KeyValueEditor({
           <Plus className="size-3" /> Add
         </Button>
       </div>
-      {entries.length === 0 && <p className="text-xs text-muted-foreground">None</p>}
-      {entries.map(([k, v], i) => (
-        <div key={i} className="flex gap-2">
+      {rows.length === 0 && <p className="text-xs text-muted-foreground">None</p>}
+      {rows.map((r) => (
+        <div key={r.id} className="flex gap-2">
           <Input
-            value={k}
+            value={r.k}
             placeholder={keyPlaceholder}
-            onChange={(e) => update(i, e.target.value, v)}
+            aria-invalid={dupes.has(r.k)}
+            onChange={(e) => update(r.id, { k: e.target.value })}
             className="h-8"
           />
           <Input
-            value={v}
+            value={r.v}
             placeholder={valuePlaceholder}
-            onChange={(e) => update(i, k, e.target.value)}
+            onChange={(e) => update(r.id, { v: e.target.value })}
             className="h-8"
           />
-          <Button type="button" variant="ghost" size="icon-sm" onClick={() => remove(i)}>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={() => remove(r.id)}>
             <X className="size-3" />
           </Button>
         </div>
       ))}
+      {dupes.size > 0 && (
+        <p className="text-xs text-destructive">Duplicate keys are ignored; rename them.</p>
+      )}
     </div>
   )
 }

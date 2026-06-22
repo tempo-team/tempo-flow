@@ -74,5 +74,24 @@ export function newNode(def: FlowDefinition): FlowNode {
 }
 
 export function newEdge(source: string, target: string, on: EdgeCondition = "success") {
-  return { id: `e-${source}-${target}-${on}-${Math.round(performance.now())}`, source, target, on }
+  return { id: `e-${crypto.randomUUID()}`, source, target, on }
+}
+
+/**
+ * Replace a node and, if its id changed, remap every edge that referenced the
+ * old id so edges never dangle.
+ */
+export function updateNodeInDef(
+  def: FlowDefinition,
+  oldId: string,
+  next: FlowNode,
+): FlowDefinition {
+  const nodes = def.nodes.map((n) => (n.id === oldId ? next : n))
+  if (next.id === oldId) return { ...def, nodes }
+  const edges = def.edges.map((e) => ({
+    ...e,
+    source: e.source === oldId ? next.id : e.source,
+    target: e.target === oldId ? next.id : e.target,
+  }))
+  return { nodes, edges }
 }
