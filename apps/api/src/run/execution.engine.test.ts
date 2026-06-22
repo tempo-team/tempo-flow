@@ -111,6 +111,35 @@ describe("ExecutionEngine", () => {
     expect(updates[0].attempt).toBe(2)
   })
 
+  it("marks a node FAILED when the executor throws (never strands the run)", async () => {
+    const def: FlowDefinition = { nodes: [node("a")], edges: [] }
+    const updates: { nodeId: string; status: RunStatus; errorMessage?: string }[] = []
+    const recorder: NodeRunRecorder = {
+      async createNodeRun() {
+        return { id: "nr-a" }
+      },
+      async updateNodeRun(_id, patch) {
+        updates.push({ nodeId: "a", status: patch.status, errorMessage: patch.errorMessage })
+      },
+    }
+    const throwing: JobExecutor = {
+      type: "http",
+      async execute(): Promise<ExecResult> {
+        throw new Error("boom")
+      },
+    }
+    const engine = new ExecutionEngine({ http: throwing }, async () => {})
+    // Must resolve (not reject) so the run is recorded, not left RUNNING.
+    const status = await engine.runFlow({
+      flowRunId: "r",
+      definition: def,
+      runDate: recorderRunDate,
+      recorder,
+    })
+    expect(status).toBe(RunStatus.Failed)
+    expect(updates[0]).toMatchObject({ status: RunStatus.Failed, errorMessage: "boom" })
+  })
+
   it("marks a node FAILED when retries are exhausted", async () => {
     const def: FlowDefinition = {
       nodes: [{ ...node("a"), retry: { max: 1, backoff: "fixed", delayMs: 0 } }],

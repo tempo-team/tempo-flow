@@ -106,10 +106,18 @@ export class ExecutionEngine {
       }
     }
 
-    const run = (): Promise<ExecResult> =>
-      node.timeoutMs
-        ? withTimeout(executor.execute(node, ctx), node.timeoutMs)
-        : executor.execute(node, ctx)
+    // Always reduce a thrown error to a failed ExecResult so the node is
+    // recorded FAILED and retry/branching proceed — a rejecting executor must
+    // never escape to the queue processor and strand the run in RUNNING.
+    const run = async (): Promise<ExecResult> => {
+      try {
+        return node.timeoutMs
+          ? await withTimeout(executor.execute(node, ctx), node.timeoutMs)
+          : await executor.execute(node, ctx)
+      } catch (err) {
+        return { ok: false, errorMessage: (err as Error).message }
+      }
+    }
 
     const max = node.retry?.max ?? 0
     let attempt = 0
