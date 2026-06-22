@@ -34,6 +34,7 @@ export async function saveFlow(
     trigger: toTrigger(state),
     enabled: state.enabled,
     overlapPolicy: state.overlapPolicy,
+    slaMs: state.slaSeconds > 0 ? state.slaSeconds * 1000 : undefined,
   }
 
   try {

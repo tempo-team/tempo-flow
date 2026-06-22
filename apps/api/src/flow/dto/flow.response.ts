@@ -11,6 +11,7 @@ interface FlowRow {
   trigger: string
   enabled: boolean
   overlapPolicy: string
+  slaMs: number | null
   createdBy: string
   createdAt: Date
   updatedAt: Date
@@ -24,6 +25,7 @@ export class FlowResponse {
   trigger!: FlowTrigger
   enabled!: boolean
   overlapPolicy!: string
+  slaMs!: number | null
   createdBy!: string
   createdAt!: string
   updatedAt!: string
@@ -37,6 +39,7 @@ export class FlowResponse {
       trigger: fromJson<FlowTrigger>(flow.trigger, { type: "manual" }),
       enabled: flow.enabled,
       overlapPolicy: flow.overlapPolicy,
+      slaMs: flow.slaMs,
       createdBy: flow.createdBy,
       createdAt: flow.createdAt.toISOString(),
       updatedAt: flow.updatedAt.toISOString(),

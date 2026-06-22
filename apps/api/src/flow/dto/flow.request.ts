@@ -2,7 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { FlowDefinition, FlowTrigger, OverlapPolicy } from "@tempo-flow/shared-types"
-import { IsBoolean, IsIn, IsObject, IsOptional, IsString, MinLength } from "class-validator"
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  Min,
+  MinLength,
+} from "class-validator"
 
 export class CreateFlowRequest {
   @IsString()
@@ -27,6 +36,12 @@ export class CreateFlowRequest {
   @IsOptional()
   @IsIn(["skip", "allow"])
   overlapPolicy?: OverlapPolicy
+
+  /** Deadline (ms) from run start; exceeding it fails the run + alerts. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  slaMs?: number
 }
 
 export class UpdateFlowRequest {
@@ -54,4 +69,9 @@ export class UpdateFlowRequest {
   @IsOptional()
   @IsIn(["skip", "allow"])
   overlapPolicy?: OverlapPolicy
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  slaMs?: number
 }

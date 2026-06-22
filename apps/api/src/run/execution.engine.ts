@@ -106,16 +106,45 @@ export class ExecutionEngine {
       }
     }
 
+    const run = (): Promise<ExecResult> =>
+      node.timeoutMs
+        ? withTimeout(executor.execute(node, ctx), node.timeoutMs)
+        : executor.execute(node, ctx)
+
     const max = node.retry?.max ?? 0
     let attempt = 0
-    let result = await executor.execute(node, ctx)
+    let result = await run()
     while (!result.ok && attempt < max) {
       attempt++
       await this.sleep(backoffDelayMs(node.retry, attempt))
-      result = await executor.execute(node, ctx)
+      result = await run()
     }
     return { result, attempt }
   }
+}
+
+/**
+ * Bound how long we wait for an executor. The underlying work can't be hard-
+ * canceled, but HTTP aborts itself and the K8s runner has its own deadline;
+ * this is a safety net so a hung executor still fails the node.
+ */
+function withTimeout(promise: Promise<ExecResult>, ms: number): Promise<ExecResult> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(
+      () => resolve({ ok: false, errorMessage: `timeout after ${ms}ms` }),
+      ms,
+    )
+    promise.then(
+      (r) => {
+        clearTimeout(timer)
+        resolve(r)
+      },
+      (err: Error) => {
+        clearTimeout(timer)
+        resolve({ ok: false, errorMessage: err.message })
+      },
+    )
+  })
 }
 
 function backoffDelayMs(

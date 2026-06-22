@@ -35,6 +35,7 @@ export class FlowService {
         trigger: toJson(input.trigger),
         enabled: input.enabled ?? true,
         overlapPolicy: input.overlapPolicy ?? "skip",
+        slaMs: input.slaMs ?? null,
         createdBy: userId,
       },
     })
@@ -58,6 +59,7 @@ export class FlowService {
     if (input.trigger !== undefined) data.trigger = toJson(input.trigger)
     if (input.enabled !== undefined) data.enabled = input.enabled
     if (input.overlapPolicy !== undefined) data.overlapPolicy = input.overlapPolicy
+    if (input.slaMs !== undefined) data.slaMs = input.slaMs
     const flow = await this.prisma.flow.update({ where: { id }, data })
     this.scheduler.register(flow)
     return flow

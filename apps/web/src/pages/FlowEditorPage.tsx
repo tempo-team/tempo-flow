@@ -168,6 +168,20 @@ export function FlowEditorPage() {
               <Label htmlFor="enabled">Enabled</Label>
             </div>
           </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="sla">SLA (seconds, 0 = none)</Label>
+            <Input
+              id="sla"
+              type="number"
+              min={0}
+              value={state.slaSeconds}
+              onChange={(e) => patch({ slaSeconds: Number(e.target.value) })}
+              className="w-40"
+            />
+            <p className="text-xs text-muted-foreground">
+              A run exceeding this deadline is failed and a notification is sent.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

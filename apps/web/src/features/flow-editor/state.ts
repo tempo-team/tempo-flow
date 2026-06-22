@@ -18,6 +18,8 @@ export interface FlowEditorState {
   cronExpr: string
   enabled: boolean
   overlapPolicy: OverlapPolicy
+  /** SLA in seconds (0 = none); converted to ms on save. */
+  slaSeconds: number
   definition: FlowDefinition
 }
 
@@ -29,6 +31,7 @@ export function emptyState(): FlowEditorState {
     cronExpr: "*/5 * * * * *",
     enabled: true,
     overlapPolicy: "skip",
+    slaSeconds: 0,
     definition: { nodes: [], edges: [] },
   }
 }
@@ -40,6 +43,7 @@ export function stateFromFlow(flow: {
   trigger: FlowTrigger
   definition: FlowDefinition
   overlapPolicy?: string
+  slaMs?: number | null
 }): FlowEditorState {
   return {
     name: flow.name,
@@ -48,6 +52,7 @@ export function stateFromFlow(flow: {
     cronExpr: flow.trigger.expr ?? "*/5 * * * * *",
     enabled: flow.enabled,
     overlapPolicy: (flow.overlapPolicy as OverlapPolicy) ?? "skip",
+    slaSeconds: flow.slaMs ? Math.round(flow.slaMs / 1000) : 0,
     definition: flow.definition,
   }
 }

@@ -53,6 +53,8 @@ export interface FlowSummary {
   enabled: boolean
   trigger: FlowTrigger
   definition: FlowDefinition
+  overlapPolicy?: OverlapPolicy
+  slaMs?: number | null
 }
 
 export interface NodeRunSummary {
@@ -86,6 +88,7 @@ export interface FlowPayload {
   trigger: FlowTrigger
   enabled?: boolean
   overlapPolicy?: OverlapPolicy
+  slaMs?: number
 }
 
 export interface MemberDto {
