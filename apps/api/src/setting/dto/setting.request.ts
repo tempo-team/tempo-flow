@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Type } from "class-transformer"
-import { IsBoolean, IsOptional, IsString, ValidateNested } from "class-validator"
+import { IsBoolean, IsInt, IsOptional, IsString, ValidateNested } from "class-validator"
 
 class SlackSettings {
   @IsOptional()
@@ -26,6 +26,64 @@ class TelegramSettings {
   @IsOptional()
   @IsString()
   chatId?: string
+}
+
+class DiscordSettings {
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean
+
+  @IsOptional()
+  @IsString()
+  webhookUrl?: string
+}
+
+class EmailSettings {
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean
+
+  @IsOptional()
+  @IsString()
+  host?: string
+
+  @IsOptional()
+  @IsInt()
+  port?: number
+
+  @IsOptional()
+  @IsBoolean()
+  secure?: boolean
+
+  @IsOptional()
+  @IsString()
+  user?: string
+
+  @IsOptional()
+  @IsString()
+  pass?: string
+
+  @IsOptional()
+  @IsString()
+  from?: string
+
+  @IsOptional()
+  @IsString()
+  to?: string
+}
+
+class WebhookSettings {
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean
+
+  @IsOptional()
+  @IsString()
+  url?: string
+
+  @IsOptional()
+  @IsString()
+  secret?: string
 }
 
 class EventSettings {
@@ -52,6 +110,21 @@ export class UpdateNotificationSettingsRequest {
   @ValidateNested()
   @Type(() => TelegramSettings)
   telegram?: TelegramSettings
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DiscordSettings)
+  discord?: DiscordSettings
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => EmailSettings)
+  email?: EmailSettings
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => WebhookSettings)
+  webhook?: WebhookSettings
 
   @IsOptional()
   @ValidateNested()

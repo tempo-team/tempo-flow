@@ -116,6 +116,18 @@ export interface UpdateMemberPayload {
 export interface NotificationConfig {
   slack?: { enabled: boolean; webhookUrl: string }
   telegram?: { enabled: boolean; botToken: string; chatId: string }
+  discord?: { enabled: boolean; webhookUrl: string }
+  email?: {
+    enabled: boolean
+    host: string
+    port: number
+    secure: boolean
+    user: string
+    pass: string
+    from: string
+    to: string
+  }
+  webhook?: { enabled: boolean; url: string; secret: string }
   events: { failed: boolean; completed: boolean; retryExhausted: boolean }
 }
 
