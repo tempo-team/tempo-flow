@@ -20,7 +20,16 @@ const k8sExecutorSchema = z.object({
   paramsAs: z.enum(["env", "args"]).optional(),
 })
 
-const executorSchema = z.discriminatedUnion("type", [httpExecutorSchema, k8sExecutorSchema])
+const subflowExecutorSchema = z.object({
+  type: z.literal("subflow"),
+  flowId: z.string().min(1),
+})
+
+const executorSchema = z.discriminatedUnion("type", [
+  httpExecutorSchema,
+  k8sExecutorSchema,
+  subflowExecutorSchema,
+])
 
 const dateParamSchema = z.object({
   key: z.string().min(1),

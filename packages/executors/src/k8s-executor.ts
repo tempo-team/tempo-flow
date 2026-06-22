@@ -90,7 +90,7 @@ export class K8sExecutor implements JobExecutor {
 
   async execute(node: FlowNode, ctx: RunContext): Promise<ExecResult> {
     const cfg = node.executor as K8sExecutorConfig
-    const params = resolveNodeParams(node, ctx.runDate, ctx.params)
+    const params = await resolveNodeParams(node, ctx.runDate, ctx.params)
     const jobName = k8sName(node.id, ctx.flowRunId)
     const manifest = buildJobManifest(node, params, { jobName })
     const namespace = cfg.namespace ?? DEFAULT_NAMESPACE

@@ -3,6 +3,7 @@
 
 import type { FlowNode } from "@tempo-flow/shared-types"
 import { addDays, addHours, addMinutes, addMonths, addYears, format as formatDate } from "date-fns"
+import jsonata from "jsonata"
 
 /**
  * Resolve a date expression against a base run date.
@@ -66,17 +67,36 @@ function applyOffset(date: Date, offset: string): Date {
 
 /**
  * Resolve a node's effective params: `static` values plus formatted
- * `dateParams`, with manual-run overrides applied last.
+ * `dateParams`, with manual-run overrides applied last. Any value of the form
+ * `={{ <jsonata> }}` is evaluated against `{ runDate, now, params }` (the params
+ * resolved so far), enabling dynamic params like `={{ params.region & "-prod" }}`.
  */
-export function resolveNodeParams(
+export async function resolveNodeParams(
   node: FlowNode,
   runDate: Date,
   overrides: Record<string, string> = {},
-): Record<string, string> {
+): Promise<Record<string, string>> {
   const result: Record<string, string> = { ...(node.params?.static ?? {}) }
   for (const dp of node.params?.dateParams ?? []) {
     const date = resolveDateExpr(dp.expr, runDate)
     result[dp.key] = formatDate(date, dp.format)
   }
-  return { ...result, ...overrides }
+  Object.assign(result, overrides)
+
+  const context = {
+    runDate: runDate.toISOString(),
+    now: new Date().toISOString(),
+    params: { ...result },
+  }
+  for (const [key, value] of Object.entries(result)) {
+    const match = /^=\{\{([\s\S]+)\}\}$/.exec(value)
+    if (!match) continue
+    try {
+      const out = await jsonata(match[1].trim()).evaluate(context)
+      result[key] = out == null ? "" : String(out)
+    } catch (err) {
+      throw new Error(`Param "${key}" expression failed: ${(err as Error).message}`)
+    }
+  }
+  return result
 }

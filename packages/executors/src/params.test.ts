@@ -46,13 +46,24 @@ describe("resolveNodeParams", () => {
     },
   }
 
-  it("merges static + formatted date params", () => {
-    const params = resolveNodeParams(node, BASE)
+  it("merges static + formatted date params", async () => {
+    const params = await resolveNodeParams(node, BASE)
     expect(params).toEqual({ source: "orders", startAt: "20260613", yyyymm: "202606" })
   })
 
-  it("applies manual overrides last (backfill)", () => {
-    const params = resolveNodeParams(node, BASE, { startAt: "20260101" })
+  it("applies manual overrides last (backfill)", async () => {
+    const params = await resolveNodeParams(node, BASE, { startAt: "20260101" })
     expect(params.startAt).toBe("20260101")
+  })
+
+  it("evaluates a JSONata param expression against resolved params", async () => {
+    const exprNode: FlowNode = {
+      id: "n2",
+      name: "x",
+      executor: { type: "http", url: "https://x.test/r", method: "POST" },
+      params: { static: { region: "kr", target: '={{ params.region & "-prod" }}' } },
+    }
+    const params = await resolveNodeParams(exprNode, BASE)
+    expect(params.target).toBe("kr-prod")
   })
 })

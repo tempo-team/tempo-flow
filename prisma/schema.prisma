@@ -150,9 +150,10 @@ model FlowRun {
   flowId     String
   flow       Flow             @relation(fields: [flowId], references: [id], onDelete: Cascade)
   status     String // PENDING_APPROVAL | PENDING | RUNNING | SUCCESS | FAILED | CANCELED
-  trigger    String // "schedule" | "manual" | "webhook" | "event" | "backfill"
+  trigger    String // "schedule" | "manual" | "webhook" | "event" | "backfill" | "subflow"
   approval   ApprovalRequest?
-  params     String?   // JSON: resolved params (date substitution applied)
+  params      String?  // JSON: resolved params (date substitution applied)
+  parentRunId String?  // set when launched as a sub-flow node of another run
   startedAt  DateTime?
   finishedAt DateTime?
   createdAt  DateTime  @default(now())
@@ -160,6 +161,7 @@ model FlowRun {
 
   @@index([flowId, status])
   @@index([startedAt])
+  @@index([parentRunId])
 }
 
 model NodeRun {

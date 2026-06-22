@@ -7,6 +7,7 @@ import type {
   FlowNode,
   HttpExecutorConfig,
   K8sExecutorConfig,
+  SubflowExecutorConfig,
 } from "@tempo-flow/shared-types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { defaultHttpExecutor, defaultK8sExecutor } from "./state"
+import { defaultHttpExecutor, defaultK8sExecutor, defaultSubflowExecutor } from "./state"
 import { KeyValueEditor } from "./KeyValueEditor"
 
 interface Props {
@@ -30,6 +31,7 @@ interface Props {
 export function NodeForm({ node, onChange }: Props) {
   const http = node.executor as HttpExecutorConfig
   const k8s = node.executor as K8sExecutorConfig
+  const subflow = node.executor as SubflowExecutorConfig
 
   function patch(p: Partial<FlowNode>): void {
     onChange({ ...node, ...p })
@@ -62,7 +64,14 @@ export function NodeForm({ node, onChange }: Props) {
         <Select
           value={node.executor.type}
           onValueChange={(t) =>
-            patch({ executor: t === "http" ? defaultHttpExecutor() : defaultK8sExecutor() })
+            patch({
+              executor:
+                t === "http"
+                  ? defaultHttpExecutor()
+                  : t === "k8s"
+                    ? defaultK8sExecutor()
+                    : defaultSubflowExecutor(),
+            })
           }
         >
           <SelectTrigger className="h-8">
@@ -71,11 +80,27 @@ export function NodeForm({ node, onChange }: Props) {
           <SelectContent>
             <SelectItem value="http">HTTP</SelectItem>
             <SelectItem value="k8s">Kubernetes Job</SelectItem>
+            <SelectItem value="subflow">Sub-flow</SelectItem>
           </SelectContent>
         </Select>
       </Field>
 
-      {node.executor.type === "http" ? (
+      {node.executor.type === "subflow" ? (
+        <div className="space-y-3 rounded-md border p-3">
+          <Field label="Child flow id">
+            <Input
+              value={subflow.flowId}
+              onChange={(e) => patchExecutor({ flowId: e.target.value })}
+              placeholder="clx… (the flow to run and wait on)"
+              className="h-8"
+            />
+          </Field>
+          <p className="text-xs text-muted-foreground">
+            Launches the target flow and waits for it to finish. This node fails if the sub-flow
+            fails. Cycles are rejected at run time.
+          </p>
+        </div>
+      ) : node.executor.type === "http" ? (
         <div className="space-y-3 rounded-md border p-3">
           <Field label="URL">
             <Input

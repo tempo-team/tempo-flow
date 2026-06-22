@@ -6,7 +6,7 @@
  * renders and the execution engine interprets. Stored as JSON in Flow.definition.
  */
 
-export type ExecutorType = "http" | "k8s"
+export type ExecutorType = "http" | "k8s" | "subflow"
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 
@@ -29,7 +29,13 @@ export interface K8sExecutorConfig {
   paramsAs?: "env" | "args"
 }
 
-export type ExecutorConfig = HttpExecutorConfig | K8sExecutorConfig
+export interface SubflowExecutorConfig {
+  type: "subflow"
+  /** The child flow to launch and wait on. */
+  flowId: string
+}
+
+export type ExecutorConfig = HttpExecutorConfig | K8sExecutorConfig | SubflowExecutorConfig
 
 /** Reservation-date parameter: `key` = `expr` formatted with `format`. */
 export interface DateParam {

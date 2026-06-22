@@ -8,7 +8,7 @@ import { PrismaService } from "../prisma/prisma.service"
 import { QueueService } from "../queue/queue.service"
 
 /** Where a run came from. Stored verbatim in FlowRun.trigger. */
-export type RunTriggerSource = "manual" | "schedule" | "webhook" | "event" | "backfill"
+export type RunTriggerSource = "manual" | "schedule" | "webhook" | "event" | "backfill" | "subflow"
 
 export interface LaunchInput {
   flowId: string
@@ -49,6 +49,7 @@ export class RunLauncherService {
         status: gated ? RunStatus.PendingApproval : RunStatus.Pending,
         trigger: input.trigger,
         params: toJson(meta),
+        ...(input.parentRunId ? { parentRunId: input.parentRunId } : {}),
         ...(gated ? { approval: { create: {} } } : {}),
       },
     })

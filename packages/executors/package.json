@@ -19,6 +19,7 @@
   "dependencies": {
     "@kubernetes/client-node": "^1.4.0",
     "@tempo-flow/shared-types": "workspace:*",
-    "date-fns": "^4.4.0"
+    "date-fns": "^4.4.0",
+    "jsonata": "^2.2.1"
   }
 }

@@ -265,6 +265,9 @@ importers:
       date-fns:
         specifier: ^4.4.0
         version: 4.4.0
+      jsonata:
+        specifier: ^2.2.1
+        version: 2.2.1
 
   packages/flow-engine:
     dependencies:
@@ -5808,6 +5811,13 @@ packages:
       }
     engines: { node: ">=6" }
     hasBin: true
+
+  jsonata@2.2.1:
+    resolution:
+      {
+        integrity: sha512-xd1uwUrKeIcJbsWhaoS3qAX4Ea8m0Mw0G5nlnAQvPT7TbZ5qaPdzBVTQia9KfyuyQm+nenfyjvzUDTRYHsC2sw==,
+      }
+    engines: { node: ">= 8" }
 
   jsonc-parser@3.2.1:
     resolution:
@@ -11803,6 +11813,8 @@ snapshots:
   json-stable-stringify-without-jsonify@1.0.1: {}
 
   json5@2.2.3: {}
+
+  jsonata@2.2.1: {}
 
   jsonc-parser@3.2.1: {}
 

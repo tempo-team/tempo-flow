@@ -20,7 +20,7 @@ export class HttpExecutor implements JobExecutor {
 
   async execute(node: FlowNode, ctx: RunContext): Promise<ExecResult> {
     const cfg = node.executor as HttpExecutorConfig
-    const params = resolveNodeParams(node, ctx.runDate, ctx.params)
+    const params = await resolveNodeParams(node, ctx.runDate, ctx.params)
     const paramsIn = cfg.paramsIn ?? "query"
 
     const url = new URL(cfg.url)

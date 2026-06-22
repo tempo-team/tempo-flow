@@ -74,6 +74,10 @@ export function defaultK8sExecutor(): ExecutorConfig {
   return { type: "k8s", image: "busybox:1.36" }
 }
 
+export function defaultSubflowExecutor(): ExecutorConfig {
+  return { type: "subflow", flowId: "" }
+}
+
 /** A fresh node with a unique id within the definition. */
 export function newNode(def: FlowDefinition): FlowNode {
   let n = def.nodes.length + 1

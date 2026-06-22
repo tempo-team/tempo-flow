@@ -21,6 +21,7 @@ import { FLOW_RUN_FINISHED, type FlowRunFinishedEvent } from "../notification/no
 import { PrismaService } from "../prisma/prisma.service"
 import { ExecutionEngine, type NodeRunRecorder } from "./execution.engine"
 import { RunLauncherService } from "./run-launcher.service"
+import { SubflowExecutor } from "./subflow.executor"
 import type { ManualRunRequest } from "./dto/run.request"
 
 interface RunMeta {
@@ -44,6 +45,7 @@ export class RunService implements NodeRunRecorder {
     const executors: Record<string, JobExecutor> = {
       http: new HttpExecutor(),
       k8s: new K8sExecutor(new DefaultK8sJobRunner()),
+      subflow: new SubflowExecutor(this.launcher, this.prisma),
     }
     this.engine = new ExecutionEngine(executors)
   }
