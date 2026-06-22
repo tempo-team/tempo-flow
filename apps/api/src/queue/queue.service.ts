@@ -34,6 +34,11 @@ export class QueueService implements OnModuleDestroy {
     })
   }
 
+  /** The underlying BullMQ queue (for metrics + the Bull-Board dashboard). */
+  getQueue(): Queue {
+    return this.queue
+  }
+
   async onModuleDestroy(): Promise<void> {
     await this.queue.close().catch(() => undefined)
   }

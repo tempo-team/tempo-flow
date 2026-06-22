@@ -3,8 +3,25 @@
 
 import "reflect-metadata"
 import { ValidationPipe } from "@nestjs/common"
+import { createBullBoard } from "@bull-board/api"
+import { BullMQAdapter } from "@bull-board/api/bullMQAdapter"
+import { ExpressAdapter } from "@bull-board/express"
 import { NestFactory } from "@nestjs/core"
+import type { NextFunction, Request, Response } from "express"
 import { AppModule } from "./app.module"
+import { QueueService } from "./queue/queue.service"
+
+/** Minimal HTTP Basic auth for the Bull-Board dashboard. */
+function bullBoardAuth(req: Request, res: Response, next: NextFunction): void {
+  const user = process.env.BULLBOARD_USER ?? "admin"
+  const pass = process.env.BULLBOARD_PASS ?? process.env.SEED_ADMIN_PASSWORD ?? "admin1234"
+  const header = req.headers.authorization ?? ""
+  const [, encoded] = header.split(" ")
+  const decoded = encoded ? Buffer.from(encoded, "base64").toString() : ""
+  if (decoded === `${user}:${pass}`) return next()
+  res.setHeader("WWW-Authenticate", 'Basic realm="tempo-flow"')
+  res.status(401).send("Authentication required")
+}
 
 /**
  * Refuse to boot in production with unset or default-valued secrets — these
@@ -39,8 +56,18 @@ async function bootstrap(): Promise<void> {
   // reflecting any origin for local dev.
   const corsOrigin = process.env.CORS_ORIGIN
   app.enableCors({ origin: corsOrigin ? corsOrigin.split(",").map((o) => o.trim()) : true })
-  // All API routes under /api; /health stays at root for container healthchecks.
-  app.setGlobalPrefix("api", { exclude: ["health"] })
+  // All API routes under /api; /health + /metrics stay at root for probes/scrapers.
+  app.setGlobalPrefix("api", { exclude: ["health", "metrics"] })
+
+  // Bull-Board queue dashboard at /admin/queues (HTTP Basic auth).
+  const serverAdapter = new ExpressAdapter()
+  serverAdapter.setBasePath("/admin/queues")
+  createBullBoard({
+    queues: [new BullMQAdapter(app.get(QueueService).getQueue())],
+    serverAdapter,
+  })
+  app.use("/admin/queues", bullBoardAuth, serverAdapter.getRouter())
+
   const port = Number(process.env.PORT ?? 3000)
   await app.listen(port)
   console.info(`tempo-flow api listening on :${port}`)

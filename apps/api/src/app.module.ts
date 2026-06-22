@@ -10,6 +10,7 @@ import { RunEventsModule } from "./events/run-events.module"
 import { FlowModule } from "./flow/flow.module"
 import { HealthController } from "./health.controller"
 import { MemberModule } from "./member/member.module"
+import { MetricsModule } from "./metrics/metrics.module"
 import { NotificationModule } from "./notification/notification.module"
 import { PrismaModule } from "./prisma/prisma.module"
 import { RedisModule } from "./redis/redis.module"
@@ -25,6 +26,7 @@ import { TriggerModule } from "./trigger/trigger.module"
     PrismaModule,
     RedisModule,
     RunEventsModule,
+    MetricsModule,
     AuthzModule,
     AuthModule,
     MemberModule,
