@@ -132,6 +132,15 @@ export interface CreatedWebhook {
   secret?: string
 }
 
+export interface EventTrigger {
+  id: string
+  source: string
+  topic: string
+  filterJson: string | null
+  enabled: boolean
+  createdAt: string
+}
+
 export const api = {
   login: (email: string, password: string) =>
     request<AuthResult>("/auth/login", {
@@ -158,6 +167,16 @@ export const api = {
     }),
   deleteWebhook: (flowId: string, webhookId: string) =>
     request<void>(`/flows/${flowId}/webhooks/${webhookId}`, { method: "DELETE" }),
+
+  // --- event triggers ---
+  listEventTriggers: (flowId: string) => request<EventTrigger[]>(`/flows/${flowId}/event-triggers`),
+  createEventTrigger: (flowId: string, body: { topic: string; filter?: Record<string, string> }) =>
+    request<EventTrigger>(`/flows/${flowId}/event-triggers`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  deleteEventTrigger: (flowId: string, triggerId: string) =>
+    request<void>(`/flows/${flowId}/event-triggers/${triggerId}`, { method: "DELETE" }),
 
   // --- runs ---
   runFlow: (id: string, body: { runDate?: string; params?: Record<string, string> }) =>

@@ -83,7 +83,22 @@ model Flow {
   updatedAt     DateTime      @updatedAt
   runs          FlowRun[]
   webhooks      FlowWebhook[]
+  eventTriggers FlowEventTrigger[]
 
+  @@index([enabled])
+}
+
+model FlowEventTrigger {
+  id         String   @id @default(cuid())
+  flowId     String
+  flow       Flow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  source     String   @default("redis") // "redis" (built-in) | kafka/rabbitmq (adapters, later)
+  topic      String
+  filterJson String? // JSON Record<string,string>; all keys must match (JSONata in Phase 12)
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@index([flowId])
   @@index([enabled])
 }
 
