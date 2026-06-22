@@ -3,7 +3,10 @@
 
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
+import { ThemeProvider } from "next-themes"
+import { Toaster } from "@/components/ui/sonner"
 import { App } from "./App"
+import "./index.css"
 
 const rootEl = document.getElementById("root")
 if (!rootEl) {
@@ -12,6 +15,14 @@ if (!rootEl) {
 
 createRoot(rootEl).render(
   <StrictMode>
-    <App />
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      storageKey="tempo-flow.theme"
+    >
+      <App />
+      <Toaster richColors closeButton />
+    </ThemeProvider>
   </StrictMode>,
 )

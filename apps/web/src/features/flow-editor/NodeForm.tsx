@@ -1,0 +1,302 @@
+// Copyright 2026 The tempo-flow Authors
+// SPDX-License-Identifier: Apache-2.0
+
+import { Plus, X } from "lucide-react"
+import type {
+  DateParam,
+  FlowNode,
+  HttpExecutorConfig,
+  K8sExecutorConfig,
+} from "@tempo-flow/shared-types"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { defaultHttpExecutor, defaultK8sExecutor } from "./state"
+import { KeyValueEditor } from "./KeyValueEditor"
+
+interface Props {
+  node: FlowNode
+  onChange: (next: FlowNode) => void
+}
+
+/** Edit a single node's config. Shared by the form list and the canvas panel. */
+export function NodeForm({ node, onChange }: Props) {
+  const http = node.executor as HttpExecutorConfig
+  const k8s = node.executor as K8sExecutorConfig
+
+  function patch(p: Partial<FlowNode>): void {
+    onChange({ ...node, ...p })
+  }
+  function patchExecutor(p: Record<string, unknown>): void {
+    onChange({ ...node, executor: { ...node.executor, ...p } as FlowNode["executor"] })
+  }
+
+  const dateParams = node.params?.dateParams ?? []
+  function setDateParams(next: DateParam[]): void {
+    onChange({ ...node, params: { ...node.params, dateParams: next } })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Node id">
+          <Input value={node.id} onChange={(e) => patch({ id: e.target.value })} className="h-8" />
+        </Field>
+        <Field label="Name">
+          <Input
+            value={node.name}
+            onChange={(e) => patch({ name: e.target.value })}
+            className="h-8"
+          />
+        </Field>
+      </div>
+
+      <Field label="Executor">
+        <Select
+          value={node.executor.type}
+          onValueChange={(t) =>
+            patch({ executor: t === "http" ? defaultHttpExecutor() : defaultK8sExecutor() })
+          }
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="http">HTTP</SelectItem>
+            <SelectItem value="k8s">Kubernetes Job</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+
+      {node.executor.type === "http" ? (
+        <div className="space-y-3 rounded-md border p-3">
+          <Field label="URL">
+            <Input
+              value={http.url}
+              onChange={(e) => patchExecutor({ url: e.target.value })}
+              placeholder="https://api.example.com/job"
+              className="h-8"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Method">
+              <Select value={http.method} onValueChange={(m) => patchExecutor({ method: m })}>
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Params in">
+              <Select
+                value={http.paramsIn ?? "query"}
+                onValueChange={(v) => patchExecutor({ paramsIn: v })}
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="query">Query string</SelectItem>
+                  <SelectItem value="body">JSON body</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <KeyValueEditor
+            label="Headers"
+            value={http.headers ?? {}}
+            onChange={(headers) => patchExecutor({ headers })}
+          />
+        </div>
+      ) : (
+        <div className="space-y-3 rounded-md border p-3">
+          <Field label="Image">
+            <Input
+              value={k8s.image}
+              onChange={(e) => patchExecutor({ image: e.target.value })}
+              placeholder="ghcr.io/acme/etl:1.0"
+              className="h-8"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Namespace">
+              <Input
+                value={k8s.namespace ?? ""}
+                onChange={(e) => patchExecutor({ namespace: e.target.value || undefined })}
+                placeholder="default"
+                className="h-8"
+              />
+            </Field>
+            <Field label="Params as">
+              <Select
+                value={k8s.paramsAs ?? "env"}
+                onValueChange={(v) => patchExecutor({ paramsAs: v })}
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="env">Env vars</SelectItem>
+                  <SelectItem value="args">Args</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <Field label="Command (space-separated)">
+            <Input
+              value={(k8s.command ?? []).join(" ")}
+              onChange={(e) =>
+                patchExecutor({ command: e.target.value ? e.target.value.split(" ") : undefined })
+              }
+              placeholder="sh -c"
+              className="h-8"
+            />
+          </Field>
+        </div>
+      )}
+
+      <KeyValueEditor
+        label="Static params"
+        value={node.params?.static ?? {}}
+        onChange={(staticParams) =>
+          onChange({ ...node, params: { ...node.params, static: staticParams } })
+        }
+      />
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">
+            Date params (reservation)
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={() =>
+              setDateParams([...dateParams, { key: "", expr: "${RUN_DATE}", format: "yyyyMMdd" }])
+            }
+          >
+            <Plus className="size-3" /> Add
+          </Button>
+        </div>
+        {dateParams.map((dp, i) => (
+          <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2">
+            <Input
+              value={dp.key}
+              placeholder="key"
+              className="h-8"
+              onChange={(e) =>
+                setDateParams(
+                  dateParams.map((d, j) => (j === i ? { ...d, key: e.target.value } : d)),
+                )
+              }
+            />
+            <Input
+              value={dp.expr}
+              placeholder="${RUN_DATE-1d}"
+              className="h-8"
+              onChange={(e) =>
+                setDateParams(
+                  dateParams.map((d, j) => (j === i ? { ...d, expr: e.target.value } : d)),
+                )
+              }
+            />
+            <Input
+              value={dp.format}
+              placeholder="yyyyMMdd"
+              className="h-8"
+              onChange={(e) =>
+                setDateParams(
+                  dateParams.map((d, j) => (j === i ? { ...d, format: e.target.value } : d)),
+                )
+              }
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setDateParams(dateParams.filter((_, j) => j !== i))}
+            >
+              <X className="size-3" />
+            </Button>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="Retry max">
+          <Input
+            type="number"
+            min={0}
+            value={node.retry?.max ?? 0}
+            className="h-8"
+            onChange={(e) =>
+              patch({
+                retry: {
+                  max: Number(e.target.value),
+                  backoff: node.retry?.backoff ?? "fixed",
+                  delayMs: node.retry?.delayMs ?? 1000,
+                },
+              })
+            }
+          />
+        </Field>
+        <Field label="Backoff">
+          <Select
+            value={node.retry?.backoff ?? "fixed"}
+            onValueChange={(b) =>
+              patch({
+                retry: {
+                  max: node.retry?.max ?? 0,
+                  backoff: b as "fixed" | "exponential",
+                  delayMs: node.retry?.delayMs ?? 1000,
+                },
+              })
+            }
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fixed">Fixed</SelectItem>
+              <SelectItem value="exponential">Exponential</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Timeout (ms)">
+          <Input
+            type="number"
+            min={0}
+            value={node.timeoutMs ?? ""}
+            className="h-8"
+            onChange={(e) =>
+              patch({ timeoutMs: e.target.value ? Number(e.target.value) : undefined })
+            }
+          />
+        </Field>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-1.5">
+      <Label className="text-xs">{label}</Label>
+      {children}
+    </div>
+  )
+}

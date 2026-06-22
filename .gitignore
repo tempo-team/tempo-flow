@@ -21,3 +21,4 @@ prisma/*.db-journal
 # local-only working dirs (not part of the OSS repo)
 thoughts/
 .claude/
+.gstack/

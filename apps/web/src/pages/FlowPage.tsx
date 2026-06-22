@@ -2,89 +2,165 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useEffect, useMemo, useState } from "react"
-import { useParams } from "react-router-dom"
 import { Background, Controls, ReactFlow } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { type FlowRunSummary, type FlowSummary, api } from "../lib/api"
-import { useAuth } from "../lib/auth"
-import { toReactFlow } from "../lib/flow-graph"
+import { ArrowLeft, Pencil, Play, Trash2 } from "lucide-react"
+import { useTheme } from "next-themes"
+import { useNavigate, useParams } from "react-router-dom"
+import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { DeleteFlowDialog } from "@/features/flows/DeleteFlowDialog"
+import { ManualRunDialog } from "@/features/runs/ManualRunDialog"
+import { RunDetailSheet } from "@/features/runs/RunDetailSheet"
+import { StatusBadge } from "@/features/runs/StatusBadge"
+import { type FlowRunSummary, type FlowSummary, api } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
+import { toReactFlow } from "@/lib/flow-graph"
 
-const STATUS_COLOR: Record<string, string> = {
-  SUCCESS: "#16a34a",
-  FAILED: "#dc2626",
-  RUNNING: "#2563eb",
-  PENDING: "#a16207",
-  CANCELED: "#64748b",
-}
-
-export function FlowPage(): JSX.Element {
+export function FlowPage() {
   const { id = "" } = useParams()
   const { can } = useAuth()
+  const { resolvedTheme } = useTheme()
+  const navigate = useNavigate()
   const [flow, setFlow] = useState<FlowSummary | null>(null)
   const [runs, setRuns] = useState<FlowRunSummary[]>([])
-  const [error, setError] = useState<string | null>(null)
+  const [selectedRun, setSelectedRun] = useState<string | null>(null)
+  const [toDelete, setToDelete] = useState<FlowSummary | null>(null)
 
-  async function reloadRuns(): Promise<void> {
-    setRuns(await api.listRuns(id))
+  function reloadRuns(): void {
+    api
+      .listRuns(id)
+      .then(setRuns)
+      .catch(() => undefined)
   }
 
   useEffect(() => {
     api
       .getFlow(id)
       .then(setFlow)
-      .catch((e: Error) => setError(e.message))
-    reloadRuns().catch(() => undefined)
+      .catch((e: Error) => toast.error("Failed to load flow", { description: e.message }))
+    reloadRuns()
   }, [id])
 
   const graph = useMemo(() => (flow ? toReactFlow(flow.definition) : null), [flow])
 
-  if (error) return <p style={{ color: "#dc2626" }}>{error}</p>
-  if (!flow || !graph) return <p>Loading…</p>
-
-  async function runNow(): Promise<void> {
-    await api.runFlow(id, {})
-    await reloadRuns()
-  }
+  if (!flow || !graph) return <div className="p-6 text-muted-foreground">Loading…</div>
 
   return (
-    <section>
-      <h2>{flow.name}</h2>
-      {flow.description && <p style={{ color: "#64748b" }}>{flow.description}</p>}
-
-      {can("execute", "flow") && (
-        <button onClick={runNow} style={{ marginBottom: 12 }}>
-          ▶ Run now
-        </button>
-      )}
-
-      <div style={{ height: 360, border: "1px solid #e2e8f0", borderRadius: 8 }}>
-        <ReactFlow nodes={graph.nodes} edges={graph.edges} fitView>
-          <Background />
-          <Controls />
-        </ReactFlow>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+            <ArrowLeft className="size-4" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight">{flow.name}</h1>
+              <Badge variant={flow.enabled ? "default" : "secondary"}>
+                {flow.enabled ? "enabled" : "disabled"}
+              </Badge>
+            </div>
+            {flow.description && (
+              <p className="text-sm text-muted-foreground">{flow.description}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {can("execute", "flow") && (
+            <ManualRunDialog flowId={flow.id} onRan={reloadRuns}>
+              <Button>
+                <Play className="mr-2 size-4" /> Run
+              </Button>
+            </ManualRunDialog>
+          )}
+          {can("edit", "flow") && (
+            <Button variant="outline" onClick={() => navigate(`/flows/${flow.id}/edit`)}>
+              <Pencil className="mr-2 size-4" /> Edit
+            </Button>
+          )}
+          {can("edit", "flow") && (
+            <Button variant="outline" size="icon" onClick={() => setToDelete(flow)}>
+              <Trash2 className="size-4 text-destructive" />
+            </Button>
+          )}
+        </div>
       </div>
 
-      <h3 style={{ marginTop: 24 }}>Runs</h3>
-      <table style={{ borderCollapse: "collapse", width: "100%" }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid #e2e8f0" }}>
-            <th style={{ padding: 8 }}>Status</th>
-            <th style={{ padding: 8 }}>Trigger</th>
-            <th style={{ padding: 8 }}>Started</th>
-            <th style={{ padding: 8 }}>Finished</th>
-          </tr>
-        </thead>
-        <tbody>
-          {runs.map((r) => (
-            <tr key={r.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-              <td style={{ padding: 8, color: STATUS_COLOR[r.status] ?? "#0f172a" }}>{r.status}</td>
-              <td style={{ padding: 8 }}>{r.trigger}</td>
-              <td style={{ padding: 8 }}>{r.startedAt ?? "—"}</td>
-              <td style={{ padding: 8 }}>{r.finishedAt ?? "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
+      <Card>
+        <CardContent className="p-0">
+          <div className="h-[560px] rounded-md">
+            <ReactFlow
+              nodes={graph.nodes}
+              edges={graph.edges}
+              fitView
+              colorMode={resolvedTheme === "dark" ? "dark" : "light"}
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background />
+              <Controls showInteractive={false} />
+            </ReactFlow>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div>
+        <h2 className="mb-3 text-lg font-semibold">Runs</h2>
+        <Card>
+          <CardContent className="p-0">
+            {runs.length === 0 ? (
+              <p className="p-6 text-sm text-muted-foreground">No runs yet.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Trigger</TableHead>
+                    <TableHead>Started</TableHead>
+                    <TableHead>Finished</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {runs.map((run) => (
+                    <TableRow
+                      key={run.id}
+                      className="cursor-pointer"
+                      onClick={() => setSelectedRun(run.id)}
+                    >
+                      <TableCell>
+                        <StatusBadge status={run.status} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{run.trigger}</TableCell>
+                      <TableCell className="font-mono text-xs">{run.startedAt ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">{run.finishedAt ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <RunDetailSheet
+        runId={selectedRun}
+        onOpenChange={(open) => !open && setSelectedRun(null)}
+        onChanged={reloadRuns}
+      />
+      <DeleteFlowDialog
+        flow={toDelete}
+        onOpenChange={(open) => !open && setToDelete(null)}
+        onDeleted={() => navigate("/")}
+      />
+    </div>
   )
 }

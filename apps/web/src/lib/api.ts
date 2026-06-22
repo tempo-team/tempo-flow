@@ -1,7 +1,12 @@
 // Copyright 2026 The tempo-flow Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import type { FlowDefinition, FlowTrigger, Permission } from "@tempo-flow/shared-types"
+import type {
+  FlowDefinition,
+  FlowTrigger,
+  OverlapPolicy,
+  Permission,
+} from "@tempo-flow/shared-types"
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api"
 const TOKEN_KEY = "tempo-flow.accessToken"
@@ -50,6 +55,19 @@ export interface FlowSummary {
   definition: FlowDefinition
 }
 
+export interface NodeRunSummary {
+  id: string
+  nodeId: string
+  status: string
+  attempt: number
+  executor: string
+  request?: unknown
+  response?: unknown
+  errorMessage: string | null
+  startedAt?: string | null
+  finishedAt?: string | null
+}
+
 export interface FlowRunSummary {
   id: string
   flowId: string
@@ -58,14 +76,47 @@ export interface FlowRunSummary {
   startedAt: string | null
   finishedAt: string | null
   createdAt: string
-  nodeRuns?: {
-    id: string
-    nodeId: string
-    status: string
-    attempt: number
-    executor: string
-    errorMessage: string | null
-  }[]
+  nodeRuns?: NodeRunSummary[]
+}
+
+export interface FlowPayload {
+  name: string
+  description?: string
+  definition: FlowDefinition
+  trigger: FlowTrigger
+  enabled?: boolean
+  overlapPolicy?: OverlapPolicy
+}
+
+export interface MemberDto {
+  id: string
+  email: string
+  name: string | null
+  active: boolean
+  roles: string[]
+  createdAt: string
+}
+export interface RoleDto {
+  id: string
+  name: string
+  description: string | null
+}
+export interface CreateMemberPayload {
+  email: string
+  password: string
+  name?: string
+  roles?: string[]
+}
+export interface UpdateMemberPayload {
+  name?: string
+  active?: boolean
+  password?: string
+}
+
+export interface NotificationConfig {
+  slack?: { enabled: boolean; webhookUrl: string }
+  telegram?: { enabled: boolean; botToken: string; chatId: string }
+  events: { failed: boolean; completed: boolean; retryExhausted: boolean }
 }
 
 export const api = {
@@ -75,11 +126,39 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   me: () => request<AuthUser>("/auth/me"),
+
+  // --- flows ---
   listFlows: () => request<FlowSummary[]>("/flows"),
   getFlow: (id: string) => request<FlowSummary>(`/flows/${id}`),
+  createFlow: (body: FlowPayload) =>
+    request<FlowSummary>("/flows", { method: "POST", body: JSON.stringify(body) }),
+  updateFlow: (id: string, body: Partial<FlowPayload>) =>
+    request<FlowSummary>(`/flows/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteFlow: (id: string) => request<void>(`/flows/${id}`, { method: "DELETE" }),
+
+  // --- runs ---
   runFlow: (id: string, body: { runDate?: string; params?: Record<string, string> }) =>
     request<FlowRunSummary>(`/flows/${id}/run`, { method: "POST", body: JSON.stringify(body) }),
   listRuns: (flowId: string) => request<FlowRunSummary[]>(`/flows/${flowId}/runs`),
   getRun: (id: string) => request<FlowRunSummary>(`/runs/${id}`),
   cancelRun: (id: string) => request<FlowRunSummary>(`/runs/${id}/cancel`, { method: "POST" }),
+
+  // --- members ---
+  listMembers: () => request<MemberDto[]>("/members"),
+  listRoles: () => request<RoleDto[]>("/members/roles"),
+  createMember: (body: CreateMemberPayload) =>
+    request<MemberDto>("/members", { method: "POST", body: JSON.stringify(body) }),
+  updateMember: (id: string, body: UpdateMemberPayload) =>
+    request<MemberDto>(`/members/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  setMemberRoles: (id: string, roles: string[]) =>
+    request<MemberDto>(`/members/${id}/roles`, { method: "PUT", body: JSON.stringify({ roles }) }),
+  deleteMember: (id: string) => request<void>(`/members/${id}`, { method: "DELETE" }),
+
+  // --- settings ---
+  getNotificationSettings: () => request<NotificationConfig>("/settings/notifications"),
+  updateNotificationSettings: (body: Partial<NotificationConfig>) =>
+    request<NotificationConfig>("/settings/notifications", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
 }

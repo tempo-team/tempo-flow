@@ -25,6 +25,14 @@ export function toReactFlow(def: FlowDefinition): {
     id: n.id,
     position: { x: 0, y: 0 },
     data: { label: n.name, executor: n.executor.type },
+    // Theme-aware styling (Tailwind preflight resets React Flow's defaults, and
+    // the dark theme would otherwise render white text on a white node).
+    style: {
+      background: "var(--card)",
+      color: "var(--card-foreground)",
+      border: "1px solid var(--border)",
+      borderRadius: "var(--radius)",
+    },
   }))
   const edges: Edge[] = def.edges.map((e) => ({
     id: e.id,
