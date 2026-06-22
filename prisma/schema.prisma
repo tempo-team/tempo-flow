@@ -76,9 +76,10 @@ model Flow {
   definition    String    // DAG JSON: { nodes[], edges[] } — workflow-as-data
   trigger       String    // JSON: { type: "cron"|"manual", expr?: string }
   enabled       Boolean   @default(true)
-  overlapPolicy String    @default("skip") // "skip" | "allow"
-  slaMs         Int? // deadline from run start; exceeding it fails the run + alerts
-  createdBy     String
+  overlapPolicy    String  @default("skip") // "skip" | "allow"
+  slaMs            Int? // deadline from run start; exceeding it fails the run + alerts
+  requiresApproval Boolean @default(false) // one-off runs wait for approve:run
+  createdBy        String
   creator       User      @relation("FlowCreatedBy", fields: [createdBy], references: [id])
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -116,12 +117,24 @@ model FlowWebhook {
   @@index([flowId])
 }
 
-model FlowRun {
+model ApprovalRequest {
   id         String    @id @default(cuid())
+  flowRunId  String    @unique
+  flowRun    FlowRun   @relation(fields: [flowRunId], references: [id], onDelete: Cascade)
+  status     String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  decidedBy  String?
+  decidedAt  DateTime?
+  note       String?
+  createdAt  DateTime  @default(now())
+}
+
+model FlowRun {
+  id         String           @id @default(cuid())
   flowId     String
-  flow       Flow      @relation(fields: [flowId], references: [id], onDelete: Cascade)
-  status     String    // PENDING | RUNNING | SUCCESS | FAILED | CANCELED
-  trigger    String    // "schedule" | "manual"
+  flow       Flow             @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  status     String // PENDING_APPROVAL | PENDING | RUNNING | SUCCESS | FAILED | CANCELED
+  trigger    String // "schedule" | "manual" | "webhook" | "event" | "backfill"
+  approval   ApprovalRequest?
   params     String?   // JSON: resolved params (date substitution applied)
   startedAt  DateTime?
   finishedAt DateTime?

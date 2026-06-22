@@ -34,22 +34,77 @@ export class RunLauncherService {
 
   async launch(input: LaunchInput) {
     const meta = { runDate: input.runDate, params: input.params }
+
+    // One-off triggers on an approval-gated flow wait for an approver; scheduled
+    // runs always execute (approving every cron tick is not meaningful).
+    const oneOff = input.trigger !== "schedule"
+    const flow = await this.prisma.flow.findUnique({ where: { id: input.flowId } })
+    const gated = oneOff && flow?.requiresApproval === true
+
     const run = await this.prisma.flowRun.create({
       data: {
         flowId: input.flowId,
-        status: RunStatus.Pending,
+        status: gated ? RunStatus.PendingApproval : RunStatus.Pending,
         trigger: input.trigger,
         params: toJson(meta),
+        ...(gated ? { approval: { create: {} } } : {}),
       },
     })
     await this.events.publish({
       kind: "run.status",
       flowRunId: run.id,
       flowId: input.flowId,
+      status: run.status as RunStatus,
+      at: new Date().toISOString(),
+    })
+    if (!gated) await this.queue.enqueueFlowRun({ flowRunId: run.id, flowId: input.flowId })
+    return run
+  }
+
+  /** Approve a pending run: enqueue it for execution. */
+  async approve(flowRunId: string, decidedBy: string, note?: string) {
+    const run = await this.prisma.flowRun.findUnique({ where: { id: flowRunId } })
+    if (!run || run.status !== RunStatus.PendingApproval) {
+      throw new Error("Run is not awaiting approval")
+    }
+    await this.prisma.approvalRequest.update({
+      where: { flowRunId },
+      data: { status: "APPROVED", decidedBy, decidedAt: new Date(), note },
+    })
+    await this.prisma.flowRun.update({
+      where: { id: flowRunId },
+      data: { status: RunStatus.Pending },
+    })
+    await this.events.publish({
+      kind: "run.status",
+      flowRunId,
+      flowId: run.flowId,
       status: RunStatus.Pending,
       at: new Date().toISOString(),
     })
-    await this.queue.enqueueFlowRun({ flowRunId: run.id, flowId: input.flowId })
-    return run
+    await this.queue.enqueueFlowRun({ flowRunId, flowId: run.flowId })
+  }
+
+  /** Reject a pending run: cancel it without executing. */
+  async reject(flowRunId: string, decidedBy: string, note?: string) {
+    const run = await this.prisma.flowRun.findUnique({ where: { id: flowRunId } })
+    if (!run || run.status !== RunStatus.PendingApproval) {
+      throw new Error("Run is not awaiting approval")
+    }
+    await this.prisma.approvalRequest.update({
+      where: { flowRunId },
+      data: { status: "REJECTED", decidedBy, decidedAt: new Date(), note },
+    })
+    await this.prisma.flowRun.update({
+      where: { id: flowRunId },
+      data: { status: RunStatus.Canceled, finishedAt: new Date() },
+    })
+    await this.events.publish({
+      kind: "run.status",
+      flowRunId,
+      flowId: run.flowId,
+      status: RunStatus.Canceled,
+      at: new Date().toISOString(),
+    })
   }
 }

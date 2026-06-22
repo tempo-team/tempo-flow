@@ -20,6 +20,8 @@ export interface FlowEditorState {
   overlapPolicy: OverlapPolicy
   /** SLA in seconds (0 = none); converted to ms on save. */
   slaSeconds: number
+  /** One-off runs (manual/webhook/event) wait for an approver before executing. */
+  requiresApproval: boolean
   definition: FlowDefinition
 }
 
@@ -32,6 +34,7 @@ export function emptyState(): FlowEditorState {
     enabled: true,
     overlapPolicy: "skip",
     slaSeconds: 0,
+    requiresApproval: false,
     definition: { nodes: [], edges: [] },
   }
 }
@@ -44,6 +47,7 @@ export function stateFromFlow(flow: {
   definition: FlowDefinition
   overlapPolicy?: string
   slaMs?: number | null
+  requiresApproval?: boolean
 }): FlowEditorState {
   return {
     name: flow.name,
@@ -53,6 +57,7 @@ export function stateFromFlow(flow: {
     enabled: flow.enabled,
     overlapPolicy: (flow.overlapPolicy as OverlapPolicy) ?? "skip",
     slaSeconds: flow.slaMs ? Math.round(flow.slaMs / 1000) : 0,
+    requiresApproval: flow.requiresApproval ?? false,
     definition: flow.definition,
   }
 }

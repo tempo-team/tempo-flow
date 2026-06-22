@@ -35,6 +35,7 @@ export async function saveFlow(
     enabled: state.enabled,
     overlapPolicy: state.overlapPolicy,
     slaMs: state.slaSeconds > 0 ? state.slaSeconds * 1000 : undefined,
+    requiresApproval: state.requiresApproval,
   }
 
   try {

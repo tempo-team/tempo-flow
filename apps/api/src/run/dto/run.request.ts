@@ -14,3 +14,9 @@ export class ManualRunRequest {
   @IsObject()
   params?: Record<string, string>
 }
+
+export class ApprovalDecisionRequest {
+  @IsOptional()
+  @IsString()
+  note?: string
+}

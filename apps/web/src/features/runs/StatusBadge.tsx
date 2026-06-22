@@ -9,6 +9,7 @@ const STYLES: Record<string, string> = {
   FAILED: "bg-destructive/15 text-destructive",
   RUNNING: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
   PENDING: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  PENDING_APPROVAL: "bg-purple-500/15 text-purple-600 dark:text-purple-400",
   CANCELED: "bg-muted text-muted-foreground",
 }
 

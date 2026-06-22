@@ -6,6 +6,7 @@
  * this object is the single source of truth shared by API and web.
  */
 export const RunStatus = {
+  PendingApproval: "PENDING_APPROVAL",
   Pending: "PENDING",
   Running: "RUNNING",
   Success: "SUCCESS",

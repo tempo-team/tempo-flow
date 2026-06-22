@@ -9,10 +9,11 @@ import type { QueueService } from "../queue/queue.service"
 import { RunLauncherService } from "./run-launcher.service"
 
 function build() {
-  const create = vi.fn().mockResolvedValue({ id: "run-1", flowId: "f1" })
+  const create = vi.fn().mockResolvedValue({ id: "run-1", flowId: "f1", status: "PENDING" })
   const enqueue = vi.fn().mockResolvedValue(undefined)
   const publish = vi.fn().mockResolvedValue(undefined)
-  const prisma = { flowRun: { create } } as unknown as PrismaService
+  const findUnique = vi.fn().mockResolvedValue({ id: "f1", requiresApproval: false })
+  const prisma = { flowRun: { create }, flow: { findUnique } } as unknown as PrismaService
   const queue = { enqueueFlowRun: enqueue } as unknown as QueueService
   const events = { publish } as unknown as RunEventsService
   return { svc: new RunLauncherService(prisma, queue, events), create, enqueue, publish }

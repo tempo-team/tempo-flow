@@ -55,6 +55,7 @@ export interface FlowSummary {
   definition: FlowDefinition
   overlapPolicy?: OverlapPolicy
   slaMs?: number | null
+  requiresApproval?: boolean
 }
 
 export interface NodeRunSummary {
@@ -89,6 +90,7 @@ export interface FlowPayload {
   enabled?: boolean
   overlapPolicy?: OverlapPolicy
   slaMs?: number
+  requiresApproval?: boolean
 }
 
 export interface MemberDto {
@@ -199,6 +201,10 @@ export const api = {
   listRuns: (flowId: string) => request<FlowRunSummary[]>(`/flows/${flowId}/runs`),
   getRun: (id: string) => request<FlowRunSummary>(`/runs/${id}`),
   cancelRun: (id: string) => request<FlowRunSummary>(`/runs/${id}/cancel`, { method: "POST" }),
+  approveRun: (id: string, note?: string) =>
+    request<void>(`/runs/${id}/approve`, { method: "POST", body: JSON.stringify({ note }) }),
+  rejectRun: (id: string, note?: string) =>
+    request<void>(`/runs/${id}/reject`, { method: "POST", body: JSON.stringify({ note }) }),
 
   // --- members ---
   listMembers: () => request<MemberDto[]>("/members"),

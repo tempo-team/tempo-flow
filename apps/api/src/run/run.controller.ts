@@ -2,18 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Body, Controller, Get, HttpCode, Param, Post, UseGuards } from "@nestjs/common"
-import { Action, Resource } from "@tempo-flow/shared-types"
+import { Action, type AuthPrincipal, Resource } from "@tempo-flow/shared-types"
 import { JwtAuthGuard } from "../auth/jwt-auth.guard"
+import { CurrentUser } from "../authz/current-user.decorator"
 import { PermissionsGuard } from "../authz/permissions.guard"
 import { RequirePermission } from "../authz/require-permission.decorator"
-import { ManualRunRequest } from "./dto/run.request"
+import { ApprovalDecisionRequest, ManualRunRequest } from "./dto/run.request"
 import { FlowRunResponse } from "./dto/run.response"
+import { RunLauncherService } from "./run-launcher.service"
 import { RunService } from "./run.service"
 
 @Controller()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RunController {
-  constructor(private readonly runs: RunService) {}
+  constructor(
+    private readonly runs: RunService,
+    private readonly launcher: RunLauncherService,
+  ) {}
 
   @Get("flows/:flowId/runs")
   @RequirePermission(Action.View, Resource.Run)
@@ -42,5 +47,27 @@ export class RunController {
   @HttpCode(200)
   async cancel(@Param("id") id: string): Promise<FlowRunResponse> {
     return FlowRunResponse.from(await this.runs.cancel(id))
+  }
+
+  @Post("runs/:id/approve")
+  @RequirePermission(Action.Approve, Resource.Run)
+  @HttpCode(204)
+  async approve(
+    @Param("id") id: string,
+    @Body() body: ApprovalDecisionRequest,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<void> {
+    await this.launcher.approve(id, user.userId, body.note)
+  }
+
+  @Post("runs/:id/reject")
+  @RequirePermission(Action.Approve, Resource.Run)
+  @HttpCode(204)
+  async reject(
+    @Param("id") id: string,
+    @Body() body: ApprovalDecisionRequest,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<void> {
+    await this.launcher.reject(id, user.userId, body.note)
   }
 }

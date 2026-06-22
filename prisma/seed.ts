@@ -28,6 +28,7 @@ const PERMISSIONS: Perm[] = [
   { action: "manage", resource: "run" },
   { action: "view", resource: "run" },
   { action: "execute", resource: "run" },
+  { action: "approve", resource: "run" },
   { action: "view", resource: "history" },
   { action: "manage", resource: "user" },
   { action: "manage", resource: "setting" },
@@ -44,6 +45,12 @@ const ROLE_PERMISSIONS: Record<string, Perm[] | "all"> = {
     { action: "view", resource: "history" },
     { action: "view", resource: "setting" },
   ],
+  approver: [
+    { action: "view", resource: "flow" },
+    { action: "view", resource: "run" },
+    { action: "approve", resource: "run" },
+    { action: "view", resource: "history" },
+  ],
   viewer: [
     { action: "view", resource: "flow" },
     { action: "view", resource: "run" },
@@ -55,6 +62,7 @@ const ROLE_PERMISSIONS: Record<string, Perm[] | "all"> = {
 const ROLE_DESCRIPTIONS: Record<string, string> = {
   admin: "Full access to flows, runs, users, and settings",
   operator: "Execute and view flows, runs, and history",
+  approver: "Approve or reject runs awaiting approval",
   viewer: "Read-only access",
 }
 

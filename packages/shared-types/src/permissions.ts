@@ -14,6 +14,7 @@ export const Action = {
   View: "view",
   Edit: "edit",
   Execute: "execute",
+  Approve: "approve",
 } as const
 
 export type Action = (typeof Action)[keyof typeof Action]

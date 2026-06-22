@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useEffect, useState } from "react"
-import { Ban, RefreshCw } from "lucide-react"
+import { Ban, Check, RefreshCw, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -60,7 +60,20 @@ export function RunDetailSheet({ runId, onOpenChange, onChanged }: Props) {
     }
   }
 
+  async function decide(kind: "approve" | "reject"): Promise<void> {
+    if (!runId) return
+    try {
+      await (kind === "approve" ? api.approveRun(runId) : api.rejectRun(runId))
+      toast.success(kind === "approve" ? "Run approved" : "Run rejected")
+      load()
+      onChanged()
+    } catch (e) {
+      toast.error("Action failed", { description: (e as Error).message })
+    }
+  }
+
   const active = run !== null && !TERMINAL.includes(run.status)
+  const awaitingApproval = run?.status === "PENDING_APPROVAL"
 
   return (
     <Sheet open={runId !== null} onOpenChange={onOpenChange}>
@@ -83,6 +96,16 @@ export function RunDetailSheet({ runId, onOpenChange, onChanged }: Props) {
                   <Button size="sm" variant="outline" onClick={cancel}>
                     <Ban className="mr-1 size-4" /> Cancel
                   </Button>
+                )}
+                {awaitingApproval && can("approve", "run") && (
+                  <>
+                    <Button size="sm" onClick={() => decide("approve")}>
+                      <Check className="mr-1 size-4" /> Approve
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => decide("reject")}>
+                      <X className="mr-1 size-4" /> Reject
+                    </Button>
+                  </>
                 )}
               </div>
               <dl className="grid grid-cols-2 gap-2 text-sm">

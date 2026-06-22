@@ -182,6 +182,14 @@ export function FlowEditorPage() {
               A run exceeding this deadline is failed and a notification is sent.
             </p>
           </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="approval"
+              checked={state.requiresApproval}
+              onCheckedChange={(v) => patch({ requiresApproval: v })}
+            />
+            <Label htmlFor="approval">Require approval before run (one-off triggers only)</Label>
+          </div>
         </CardContent>
       </Card>
 
