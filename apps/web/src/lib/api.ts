@@ -158,6 +158,18 @@ export interface EventTrigger {
   createdAt: string
 }
 
+export interface FlowVersion {
+  id: string
+  flowId: string
+  version: number
+  name: string
+  description: string | null
+  definition: string
+  trigger: string
+  createdBy: string | null
+  createdAt: string
+}
+
 export const api = {
   login: (email: string, password: string) =>
     request<AuthResult>("/auth/login", {
@@ -174,6 +186,9 @@ export const api = {
   updateFlow: (id: string, body: Partial<FlowPayload>) =>
     request<FlowSummary>(`/flows/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteFlow: (id: string) => request<void>(`/flows/${id}`, { method: "DELETE" }),
+  listVersions: (id: string) => request<FlowVersion[]>(`/flows/${id}/versions`),
+  restoreVersion: (id: string, version: number) =>
+    request<FlowSummary>(`/flows/${id}/versions/${version}/restore`, { method: "POST" }),
 
   // --- webhooks (triggers) ---
   listWebhooks: (flowId: string) => request<WebhookSummary[]>(`/flows/${flowId}/webhooks`),

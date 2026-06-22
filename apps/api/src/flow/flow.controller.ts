@@ -50,8 +50,12 @@ export class FlowController {
 
   @Patch(":id")
   @RequirePermission(Action.Edit, Resource.Flow)
-  async update(@Param("id") id: string, @Body() body: UpdateFlowRequest): Promise<FlowResponse> {
-    return FlowResponse.from(await this.flows.update(id, body))
+  async update(
+    @Param("id") id: string,
+    @Body() body: UpdateFlowRequest,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<FlowResponse> {
+    return FlowResponse.from(await this.flows.update(id, body, user.userId))
   }
 
   @Delete(":id")
@@ -59,5 +63,27 @@ export class FlowController {
   @HttpCode(204)
   async remove(@Param("id") id: string): Promise<void> {
     await this.flows.remove(id)
+  }
+
+  @Get(":id/versions")
+  @RequirePermission(Action.View, Resource.Flow)
+  listVersions(@Param("id") id: string) {
+    return this.flows.listVersions(id)
+  }
+
+  @Get(":id/versions/:version")
+  @RequirePermission(Action.View, Resource.Flow)
+  getVersion(@Param("id") id: string, @Param("version") version: string) {
+    return this.flows.getVersion(id, Number(version))
+  }
+
+  @Post(":id/versions/:version/restore")
+  @RequirePermission(Action.Edit, Resource.Flow)
+  async restore(
+    @Param("id") id: string,
+    @Param("version") version: string,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<FlowResponse> {
+    return FlowResponse.from(await this.flows.restore(id, Number(version), user.userId))
   }
 }

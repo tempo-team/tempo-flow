@@ -86,8 +86,25 @@ model Flow {
   runs          FlowRun[]
   webhooks      FlowWebhook[]
   eventTriggers FlowEventTrigger[]
+  versions      FlowVersion[]
 
   @@index([enabled])
+}
+
+model FlowVersion {
+  id          String   @id @default(cuid())
+  flowId      String
+  flow        Flow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  version     Int
+  name        String
+  description String?
+  definition  String
+  trigger     String
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  @@unique([flowId, version])
+  @@index([flowId])
 }
 
 model FlowEventTrigger {

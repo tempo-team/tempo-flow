@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { EventTriggerPanel } from "@/features/flow/EventTriggerPanel"
+import { VersionHistory } from "@/features/flow/VersionHistory"
 import { WebhookPanel } from "@/features/flow/WebhookPanel"
 import { DeleteFlowDialog } from "@/features/flows/DeleteFlowDialog"
 import { BackfillDialog } from "@/features/runs/BackfillDialog"
@@ -131,6 +132,9 @@ export function FlowPage() {
 
       {can("edit", "flow") && <WebhookPanel flowId={flow.id} />}
       {can("edit", "flow") && <EventTriggerPanel flowId={flow.id} />}
+      {can("view", "flow") && (
+        <VersionHistory flowId={flow.id} onRestored={() => api.getFlow(flow.id).then(setFlow)} />
+      )}
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">Runs</h2>

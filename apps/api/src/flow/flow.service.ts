@@ -43,14 +43,16 @@ export class FlowService {
     return flow
   }
 
-  async update(id: string, input: UpdateFlowRequest) {
-    await this.get(id)
+  async update(id: string, input: UpdateFlowRequest, userId?: string) {
+    const current = await this.get(id)
     if (input.definition !== undefined || input.trigger !== undefined) {
       // Re-validate against the (possibly partial) new definition/trigger.
       const def = input.definition ?? (await this.parseExisting(id)).definition
       const trigger = input.trigger ?? (await this.parseExisting(id)).trigger
       this.assertValid(def, trigger)
     }
+    // Snapshot the pre-update state so it can be diffed / rolled back.
+    await this.snapshot(current, userId)
 
     const data: Record<string, unknown> = {}
     if (input.name !== undefined) data.name = input.name
@@ -69,6 +71,66 @@ export class FlowService {
     await this.get(id)
     await this.prisma.flow.delete({ where: { id } })
     this.scheduler.unregister(id)
+  }
+
+  // --- versioning ---
+
+  listVersions(flowId: string) {
+    return this.prisma.flowVersion.findMany({
+      where: { flowId },
+      orderBy: { version: "desc" },
+    })
+  }
+
+  async getVersion(flowId: string, version: number) {
+    const row = await this.prisma.flowVersion.findUnique({
+      where: { flowId_version: { flowId, version } },
+    })
+    if (!row) throw new NotFoundException("Version not found")
+    return row
+  }
+
+  /** Restore a flow to a previous version (snapshotting the current first). */
+  async restore(flowId: string, version: number, userId?: string) {
+    const target = await this.getVersion(flowId, version)
+    return this.update(
+      flowId,
+      {
+        name: target.name,
+        description: target.description ?? undefined,
+        definition: JSON.parse(target.definition),
+        trigger: JSON.parse(target.trigger),
+      },
+      userId,
+    )
+  }
+
+  private async snapshot(
+    flow: {
+      id: string
+      name: string
+      description: string | null
+      definition: string
+      trigger: string
+    },
+    userId?: string,
+  ): Promise<void> {
+    const last = await this.prisma.flowVersion.findFirst({
+      where: { flowId: flow.id },
+      orderBy: { version: "desc" },
+      select: { version: true },
+    })
+    await this.prisma.flowVersion.create({
+      data: {
+        flowId: flow.id,
+        version: (last?.version ?? 0) + 1,
+        name: flow.name,
+        description: flow.description,
+        definition: flow.definition,
+        trigger: flow.trigger,
+        createdBy: userId,
+      },
+    })
   }
 
   private async parseExisting(id: string) {
