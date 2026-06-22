@@ -6,7 +6,7 @@ import { Injectable, Logger, type OnModuleInit } from "@nestjs/common"
 import { type FlowTrigger, RunStatus, fromJson } from "@tempo-flow/shared-types"
 import { Cron } from "croner"
 import { PrismaService } from "../prisma/prisma.service"
-import { QueueService } from "../queue/queue.service"
+import { RunLauncherService } from "../run/run-launcher.service"
 import { LockService } from "./lock.service"
 
 interface SchedulableFlow {
@@ -23,7 +23,7 @@ export class SchedulerService implements OnModuleInit {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly queue: QueueService,
+    private readonly launcher: RunLauncherService,
     private readonly lock: LockService,
   ) {}
 
@@ -88,10 +88,7 @@ export class SchedulerService implements OnModuleInit {
       }
     }
 
-    const run = await this.prisma.flowRun.create({
-      data: { flowId: flow.id, status: RunStatus.Pending, trigger: "schedule" },
-    })
-    await this.queue.enqueueFlowRun({ flowRunId: run.id, flowId: flow.id })
+    const run = await this.launcher.launch({ flowId: flow.id, trigger: "schedule" })
     this.logger.log(`Enqueued flow ${flow.id} run ${run.id}`)
   }
 

@@ -16,10 +16,11 @@ import {
   isTerminal,
   toJson,
 } from "@tempo-flow/shared-types"
+import { RunEventsService } from "../events/run-events.service"
 import { FLOW_RUN_FINISHED, type FlowRunFinishedEvent } from "../notification/notification.listener"
 import { PrismaService } from "../prisma/prisma.service"
-import { QueueService } from "../queue/queue.service"
 import { ExecutionEngine, type NodeRunRecorder } from "./execution.engine"
+import { RunLauncherService } from "./run-launcher.service"
 import type { ManualRunRequest } from "./dto/run.request"
 
 interface RunMeta {
@@ -34,8 +35,9 @@ export class RunService implements NodeRunRecorder {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly queue: QueueService,
+    private readonly launcher: RunLauncherService,
     private readonly events: EventEmitter2,
+    private readonly runEvents: RunEventsService,
   ) {
     // K8s runner lazily loads kube config on first use, so constructing it here
     // does not require a cluster to be reachable at boot.
@@ -66,22 +68,29 @@ export class RunService implements NodeRunRecorder {
   async manualRun(flowId: string, body: ManualRunRequest) {
     const flow = await this.prisma.flow.findUnique({ where: { id: flowId } })
     if (!flow) throw new NotFoundException("Flow not found")
-
-    const meta: RunMeta = { runDate: body.runDate, params: body.params }
-    const run = await this.prisma.flowRun.create({
-      data: { flowId, status: RunStatus.Pending, trigger: "manual", params: toJson(meta) },
+    return this.launcher.launch({
+      flowId,
+      trigger: "manual",
+      runDate: body.runDate,
+      params: body.params,
     })
-    await this.queue.enqueueFlowRun({ flowRunId: run.id, flowId })
-    return run
   }
 
   async cancel(id: string) {
     const run = await this.getRun(id)
     if (isTerminal(run.status as RunStatus)) return run
-    return this.prisma.flowRun.update({
+    const updated = await this.prisma.flowRun.update({
       where: { id },
       data: { status: RunStatus.Canceled, finishedAt: new Date() },
     })
+    await this.runEvents.publish({
+      kind: "run.status",
+      flowRunId: id,
+      flowId: updated.flowId,
+      status: RunStatus.Canceled,
+      at: new Date().toISOString(),
+    })
+    return updated
   }
 
   /** Execute a queued run end-to-end (invoked by the BullMQ worker). */
@@ -105,6 +114,13 @@ export class RunService implements NodeRunRecorder {
       where: { id: flowRunId },
       data: { status: RunStatus.Running, startedAt: new Date() },
     })
+    await this.runEvents.publish({
+      kind: "run.status",
+      flowRunId,
+      flowId: run.flowId,
+      status: RunStatus.Running,
+      at: new Date().toISOString(),
+    })
 
     const status = await this.engine.runFlow({
       flowRunId,
@@ -126,6 +142,13 @@ export class RunService implements NodeRunRecorder {
     }
     this.logger.log(`Run ${flowRunId} finished: ${status}`)
 
+    await this.runEvents.publish({
+      kind: "run.status",
+      flowRunId,
+      flowId: run.flowId,
+      status,
+      at: new Date().toISOString(),
+    })
     const event: FlowRunFinishedEvent = { flowName: run.flow.name, flowRunId, status }
     this.events.emit(FLOW_RUN_FINISHED, event)
     return status
@@ -143,6 +166,15 @@ export class RunService implements NodeRunRecorder {
         startedAt: new Date(),
       },
     })
+    await this.runEvents.publish({
+      kind: "node.status",
+      flowRunId: input.flowRunId,
+      nodeId: input.nodeId,
+      nodeRunId: row.id,
+      status: RunStatus.Running,
+      attempt: 0,
+      at: new Date().toISOString(),
+    })
     return { id: row.id }
   }
 
@@ -156,7 +188,7 @@ export class RunService implements NodeRunRecorder {
       errorMessage?: string
     },
   ): Promise<void> {
-    await this.prisma.nodeRun.update({
+    const row = await this.prisma.nodeRun.update({
       where: { id },
       data: {
         status: patch.status,
@@ -166,6 +198,16 @@ export class RunService implements NodeRunRecorder {
         errorMessage: patch.errorMessage,
         finishedAt: new Date(),
       },
+    })
+    await this.runEvents.publish({
+      kind: "node.status",
+      flowRunId: row.flowRunId,
+      nodeId: row.nodeId,
+      nodeRunId: row.id,
+      status: patch.status,
+      attempt: patch.attempt,
+      at: new Date().toISOString(),
+      errorMessage: patch.errorMessage,
     })
   }
 }

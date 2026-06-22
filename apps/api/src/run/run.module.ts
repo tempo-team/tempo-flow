@@ -5,10 +5,11 @@ import { Module } from "@nestjs/common"
 import { QueueModule } from "../queue/queue.module"
 import { FlowProcessor } from "./flow.processor"
 import { RunController } from "./run.controller"
+import { RunLauncherModule } from "./run-launcher.module"
 import { RunService } from "./run.service"
 
 @Module({
-  imports: [QueueModule],
+  imports: [QueueModule, RunLauncherModule],
   controllers: [RunController],
   providers: [RunService, FlowProcessor],
   exports: [RunService],

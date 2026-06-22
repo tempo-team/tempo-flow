@@ -6,6 +6,7 @@ import { ConfigModule } from "@nestjs/config"
 import { EventEmitterModule } from "@nestjs/event-emitter"
 import { AuthModule } from "./auth/auth.module"
 import { AuthzModule } from "./authz/authz.module"
+import { RunEventsModule } from "./events/run-events.module"
 import { FlowModule } from "./flow/flow.module"
 import { HealthController } from "./health.controller"
 import { MemberModule } from "./member/member.module"
@@ -22,6 +23,7 @@ import { SettingModule } from "./setting/setting.module"
     EventEmitterModule.forRoot(),
     PrismaModule,
     RedisModule,
+    RunEventsModule,
     AuthzModule,
     AuthModule,
     MemberModule,

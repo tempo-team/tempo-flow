@@ -4,7 +4,7 @@
 import { toJson } from "@tempo-flow/shared-types"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { PrismaService } from "../prisma/prisma.service"
-import type { QueueService } from "../queue/queue.service"
+import type { RunLauncherService } from "../run/run-launcher.service"
 import type { LockService } from "./lock.service"
 import { SchedulerService } from "./scheduler.service"
 
@@ -14,21 +14,19 @@ function cronFlow(id: string, expr: string, overlapPolicy = "skip") {
 
 function build(opts: { acquire?: boolean; activeRuns?: number }): {
   svc: SchedulerService
-  create: ReturnType<typeof vi.fn>
-  enqueue: ReturnType<typeof vi.fn>
+  launch: ReturnType<typeof vi.fn>
 } {
-  const create = vi.fn().mockResolvedValue({ id: "run-1" })
   const count = vi.fn().mockResolvedValue(opts.activeRuns ?? 0)
-  const enqueue = vi.fn().mockResolvedValue(undefined)
+  const launch = vi.fn().mockResolvedValue({ id: "run-1" })
   const prisma = {
     flow: { findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn() },
-    flowRun: { create, count },
+    flowRun: { count },
   } as unknown as PrismaService
-  const queue = { enqueueFlowRun: enqueue } as unknown as QueueService
+  const launcher = { launch } as unknown as RunLauncherService
   const lock = {
     acquire: vi.fn().mockResolvedValue(opts.acquire ?? true),
   } as unknown as LockService
-  return { svc: new SchedulerService(prisma, queue, lock), create, enqueue }
+  return { svc: new SchedulerService(prisma, launcher, lock), launch }
 }
 
 describe("SchedulerService.register", () => {
@@ -64,29 +62,26 @@ describe("SchedulerService.register", () => {
 
 describe("SchedulerService.trigger", () => {
   it("skips when the tick lock is not acquired (distributed dedup)", async () => {
-    const { svc, create, enqueue } = build({ acquire: false })
+    const { svc, launch } = build({ acquire: false })
     await svc.trigger(cronFlow("f1", "*/5 * * * * *"))
-    expect(create).not.toHaveBeenCalled()
-    expect(enqueue).not.toHaveBeenCalled()
+    expect(launch).not.toHaveBeenCalled()
   })
 
   it("skips when a previous run is still active and overlap=skip", async () => {
-    const { svc, create, enqueue } = build({ acquire: true, activeRuns: 1 })
+    const { svc, launch } = build({ acquire: true, activeRuns: 1 })
     await svc.trigger(cronFlow("f1", "*/5 * * * * *", "skip"))
-    expect(create).not.toHaveBeenCalled()
-    expect(enqueue).not.toHaveBeenCalled()
+    expect(launch).not.toHaveBeenCalled()
   })
 
-  it("creates a run and enqueues when free", async () => {
-    const { svc, create, enqueue } = build({ acquire: true, activeRuns: 0 })
+  it("launches a schedule run when free", async () => {
+    const { svc, launch } = build({ acquire: true, activeRuns: 0 })
     await svc.trigger(cronFlow("f1", "*/5 * * * * *"))
-    expect(create).toHaveBeenCalledOnce()
-    expect(enqueue).toHaveBeenCalledWith({ flowRunId: "run-1", flowId: "f1" })
+    expect(launch).toHaveBeenCalledWith({ flowId: "f1", trigger: "schedule" })
   })
 
   it("allows overlap when policy=allow", async () => {
-    const { svc, create } = build({ acquire: true, activeRuns: 3 })
+    const { svc, launch } = build({ acquire: true, activeRuns: 3 })
     await svc.trigger(cronFlow("f1", "*/5 * * * * *", "allow"))
-    expect(create).toHaveBeenCalledOnce()
+    expect(launch).toHaveBeenCalledOnce()
   })
 })
