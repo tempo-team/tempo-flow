@@ -28,6 +28,7 @@ import { StatusBadge } from "@/features/runs/StatusBadge"
 import { type FlowRunSummary, type FlowSummary, api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { toReactFlow } from "@/lib/flow-graph"
+import { useRunStream } from "@/lib/useRunStream"
 
 export function FlowPage() {
   const { id = "" } = useParams()
@@ -53,6 +54,11 @@ export function FlowPage() {
       .catch((e: Error) => toast.error("Failed to load flow", { description: e.message }))
     reloadRuns()
   }, [id])
+
+  // Live runs table: reload when a run for this flow changes status.
+  useRunStream("*", (event) => {
+    if (event.kind === "run.status" && event.flowId === id) reloadRuns()
+  })
 
   const graph = useMemo(() => (flow ? toReactFlow(flow.definition) : null), [flow])
 

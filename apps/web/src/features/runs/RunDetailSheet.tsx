@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { type FlowRunSummary, api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { useRunStream } from "@/lib/useRunStream"
 import { StatusBadge } from "./StatusBadge"
 
 interface Props {
@@ -35,6 +36,9 @@ export function RunDetailSheet({ runId, onOpenChange, onChanged }: Props) {
     setRun(null)
     load()
   }, [runId])
+
+  // Live updates: refetch whenever this run or its nodes change.
+  useRunStream(runId, () => load())
 
   async function cancel(): Promise<void> {
     if (!runId) return
