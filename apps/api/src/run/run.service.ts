@@ -1,7 +1,7 @@
 // Copyright 2026 The tempo-flow Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { EventEmitter2 } from "@nestjs/event-emitter"
 import {
   DefaultK8sJobRunner,
@@ -74,6 +74,28 @@ export class RunService implements NodeRunRecorder {
       runDate: body.runDate,
       params: body.params,
     })
+  }
+
+  /** Create a run per interval across a date range (trigger=backfill). */
+  async backfill(
+    flowId: string,
+    input: { from: string; to: string; stepHours?: number },
+  ): Promise<{ count: number }> {
+    const flow = await this.prisma.flow.findUnique({ where: { id: flowId } })
+    if (!flow) throw new NotFoundException("Flow not found")
+    const start = new Date(input.from).getTime()
+    const end = new Date(input.to).getTime()
+    const step = Math.max(1, input.stepHours ?? 24) * 3_600_000
+    if (Number.isNaN(start) || Number.isNaN(end) || end < start) {
+      throw new BadRequestException("Invalid date range")
+    }
+    const dates: Date[] = []
+    for (let t = start; t <= end; t += step) dates.push(new Date(t))
+    if (dates.length > 500) throw new BadRequestException("Backfill would create >500 runs")
+    for (const d of dates) {
+      await this.launcher.launch({ flowId, trigger: "backfill", runDate: d.toISOString() })
+    }
+    return { count: dates.length }
   }
 
   async cancel(id: string) {

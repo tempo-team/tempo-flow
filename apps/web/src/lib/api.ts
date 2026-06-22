@@ -198,6 +198,11 @@ export const api = {
   // --- runs ---
   runFlow: (id: string, body: { runDate?: string; params?: Record<string, string> }) =>
     request<FlowRunSummary>(`/flows/${id}/run`, { method: "POST", body: JSON.stringify(body) }),
+  backfill: (id: string, body: { from: string; to: string; stepHours?: number }) =>
+    request<{ count: number }>(`/flows/${id}/backfill`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   listRuns: (flowId: string) => request<FlowRunSummary[]>(`/flows/${flowId}/runs`),
   getRun: (id: string) => request<FlowRunSummary>(`/runs/${id}`),
   cancelRun: (id: string) => request<FlowRunSummary>(`/runs/${id}/cancel`, { method: "POST" }),

@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Background, Controls, ReactFlow } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { ArrowLeft, Pencil, Play, Trash2 } from "lucide-react"
+import { ArrowLeft, CalendarRange, Pencil, Play, Trash2 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
@@ -22,6 +22,7 @@ import {
 import { EventTriggerPanel } from "@/features/flow/EventTriggerPanel"
 import { WebhookPanel } from "@/features/flow/WebhookPanel"
 import { DeleteFlowDialog } from "@/features/flows/DeleteFlowDialog"
+import { BackfillDialog } from "@/features/runs/BackfillDialog"
 import { ManualRunDialog } from "@/features/runs/ManualRunDialog"
 import { RunDetailSheet } from "@/features/runs/RunDetailSheet"
 import { StatusBadge } from "@/features/runs/StatusBadge"
@@ -90,6 +91,13 @@ export function FlowPage() {
                 <Play className="mr-2 size-4" /> Run
               </Button>
             </ManualRunDialog>
+          )}
+          {can("execute", "flow") && (
+            <BackfillDialog flowId={flow.id} onDone={reloadRuns}>
+              <Button variant="outline">
+                <CalendarRange className="mr-2 size-4" /> Backfill
+              </Button>
+            </BackfillDialog>
           )}
           {can("edit", "flow") && (
             <Button variant="outline" onClick={() => navigate(`/flows/${flow.id}/edit`)}>

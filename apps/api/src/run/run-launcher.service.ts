@@ -35,11 +35,13 @@ export class RunLauncherService {
   async launch(input: LaunchInput) {
     const meta = { runDate: input.runDate, params: input.params }
 
-    // One-off triggers on an approval-gated flow wait for an approver; scheduled
-    // runs always execute (approving every cron tick is not meaningful).
-    const oneOff = input.trigger !== "schedule"
+    // Interactive one-off triggers on an approval-gated flow wait for an
+    // approver. Scheduled + backfill runs always execute (approving every cron
+    // tick or backfill slice is not meaningful — those are operator actions).
+    const interactive =
+      input.trigger === "manual" || input.trigger === "webhook" || input.trigger === "event"
     const flow = await this.prisma.flow.findUnique({ where: { id: input.flowId } })
-    const gated = oneOff && flow?.requiresApproval === true
+    const gated = interactive && flow?.requiresApproval === true
 
     const run = await this.prisma.flowRun.create({
       data: {

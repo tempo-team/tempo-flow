@@ -7,7 +7,7 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard"
 import { CurrentUser } from "../authz/current-user.decorator"
 import { PermissionsGuard } from "../authz/permissions.guard"
 import { RequirePermission } from "../authz/require-permission.decorator"
-import { ApprovalDecisionRequest, ManualRunRequest } from "./dto/run.request"
+import { ApprovalDecisionRequest, BackfillRequest, ManualRunRequest } from "./dto/run.request"
 import { FlowRunResponse } from "./dto/run.response"
 import { RunLauncherService } from "./run-launcher.service"
 import { RunService } from "./run.service"
@@ -40,6 +40,15 @@ export class RunController {
     @Body() body: ManualRunRequest,
   ): Promise<FlowRunResponse> {
     return FlowRunResponse.from(await this.runs.manualRun(flowId, body))
+  }
+
+  @Post("flows/:flowId/backfill")
+  @RequirePermission(Action.Execute, Resource.Flow)
+  async backfill(
+    @Param("flowId") flowId: string,
+    @Body() body: BackfillRequest,
+  ): Promise<{ count: number }> {
+    return this.runs.backfill(flowId, body)
   }
 
   @Post("runs/:id/cancel")
