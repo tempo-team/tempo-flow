@@ -16,6 +16,7 @@ import { RedisModule } from "./redis/redis.module"
 import { RunModule } from "./run/run.module"
 import { SchedulerModule } from "./scheduler/scheduler.module"
 import { SettingModule } from "./setting/setting.module"
+import { TriggerModule } from "./trigger/trigger.module"
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { SettingModule } from "./setting/setting.module"
     RunModule,
     SettingModule,
     NotificationModule,
+    TriggerModule,
   ],
   controllers: [HealthController],
 })

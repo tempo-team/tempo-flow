@@ -119,6 +119,19 @@ export interface NotificationConfig {
   events: { failed: boolean; completed: boolean; retryExhausted: boolean }
 }
 
+export interface WebhookSummary {
+  id: string
+  label: string | null
+  enabled: boolean
+  hasSecret: boolean
+  createdAt: string
+}
+export interface CreatedWebhook {
+  id: string
+  token: string
+  secret?: string
+}
+
 export const api = {
   login: (email: string, password: string) =>
     request<AuthResult>("/auth/login", {
@@ -135,6 +148,16 @@ export const api = {
   updateFlow: (id: string, body: Partial<FlowPayload>) =>
     request<FlowSummary>(`/flows/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteFlow: (id: string) => request<void>(`/flows/${id}`, { method: "DELETE" }),
+
+  // --- webhooks (triggers) ---
+  listWebhooks: (flowId: string) => request<WebhookSummary[]>(`/flows/${flowId}/webhooks`),
+  createWebhook: (flowId: string, body: { label?: string; withSecret?: boolean }) =>
+    request<CreatedWebhook>(`/flows/${flowId}/webhooks`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  deleteWebhook: (flowId: string, webhookId: string) =>
+    request<void>(`/flows/${flowId}/webhooks/${webhookId}`, { method: "DELETE" }),
 
   // --- runs ---
   runFlow: (id: string, body: { runDate?: string; params?: Record<string, string> }) =>

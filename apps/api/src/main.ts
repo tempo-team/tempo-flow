@@ -32,7 +32,8 @@ function assertProductionSecrets(): void {
 
 async function bootstrap(): Promise<void> {
   assertProductionSecrets()
-  const app = await NestFactory.create(AppModule)
+  // rawBody is kept so webhook HMAC signatures can be verified over exact bytes.
+  const app = await NestFactory.create(AppModule, { rawBody: true })
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))
   // Restrict origins in production via CORS_ORIGIN (comma-separated); defaults to
   // reflecting any origin for local dev.

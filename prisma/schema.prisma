@@ -79,11 +79,25 @@ model Flow {
   overlapPolicy String    @default("skip") // "skip" | "allow"
   createdBy     String
   creator       User      @relation("FlowCreatedBy", fields: [createdBy], references: [id])
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   runs          FlowRun[]
+  webhooks      FlowWebhook[]
 
   @@index([enabled])
+}
+
+model FlowWebhook {
+  id              String   @id @default(cuid())
+  flowId          String
+  flow            Flow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  tokenHash       String   @unique // sha256(token) for O(1) lookup; raw token shown once
+  secretEncrypted String? // AES-GCM(HMAC secret) for optional signature verification
+  label           String?
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  @@index([flowId])
 }
 
 model FlowRun {

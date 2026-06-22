@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { WebhookPanel } from "@/features/flow/WebhookPanel"
 import { DeleteFlowDialog } from "@/features/flows/DeleteFlowDialog"
 import { ManualRunDialog } from "@/features/runs/ManualRunDialog"
 import { RunDetailSheet } from "@/features/runs/RunDetailSheet"
@@ -112,6 +113,8 @@ export function FlowPage() {
           </div>
         </CardContent>
       </Card>
+
+      {can("edit", "flow") && <WebhookPanel flowId={flow.id} />}
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">Runs</h2>
