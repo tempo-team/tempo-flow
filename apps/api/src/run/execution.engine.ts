@@ -26,6 +26,8 @@ export interface NodeRunRecorder {
       errorMessage?: string
     },
   ): Promise<void>
+  /** Emit a live log line for a node (best-effort, fire-and-forget). */
+  nodeLog?(flowRunId: string, nodeId: string, line: string): void
 }
 
 export interface RunFlowArgs {
@@ -72,6 +74,7 @@ export class ExecutionEngine {
         flowRunId: args.flowRunId,
         runDate: args.runDate,
         params: args.params,
+        onLog: (line) => recorder.nodeLog?.(args.flowRunId, nodeId, line),
       }
       const { result, attempt } = await this.executeWithRetry(node, ctx)
 

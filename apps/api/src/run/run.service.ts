@@ -178,6 +178,17 @@ export class RunService implements NodeRunRecorder {
     return { id: row.id }
   }
 
+  /** Publish a live log line for a node (not persisted; surfaced via SSE). */
+  nodeLog(flowRunId: string, nodeId: string, line: string): void {
+    void this.runEvents.publish({
+      kind: "node.log",
+      flowRunId,
+      nodeId,
+      line,
+      at: new Date().toISOString(),
+    })
+  }
+
   async updateNodeRun(
     id: string,
     patch: {

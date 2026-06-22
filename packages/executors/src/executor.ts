@@ -10,6 +10,8 @@ export interface RunContext {
   runDate: Date
   /** Extra params merged on top of the node's resolved params (manual runs). */
   params?: Record<string, string>
+  /** Emit a live log line for this node (streamed to the UI). Best-effort. */
+  onLog?: (line: string) => void
 }
 
 /** Result of executing one node. */

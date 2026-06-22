@@ -23,6 +23,7 @@ const TERMINAL = ["SUCCESS", "FAILED", "CANCELED"]
 export function RunDetailSheet({ runId, onOpenChange, onChanged }: Props) {
   const { can } = useAuth()
   const [run, setRun] = useState<FlowRunSummary | null>(null)
+  const [logs, setLogs] = useState<Record<string, string[]>>({})
 
   function load(): void {
     if (!runId) return
@@ -34,11 +35,18 @@ export function RunDetailSheet({ runId, onOpenChange, onChanged }: Props) {
 
   useEffect(() => {
     setRun(null)
+    setLogs({})
     load()
   }, [runId])
 
-  // Live updates: refetch whenever this run or its nodes change.
-  useRunStream(runId, () => load())
+  // Live updates: stream log lines into per-node buffers; refetch on status change.
+  useRunStream(runId, (event) => {
+    if (event.kind === "node.log") {
+      setLogs((m) => ({ ...m, [event.nodeId]: [...(m[event.nodeId] ?? []), event.line] }))
+    } else {
+      load()
+    }
+  })
 
   async function cancel(): Promise<void> {
     if (!runId) return
@@ -99,6 +107,11 @@ export function RunDetailSheet({ runId, onOpenChange, onChanged }: Props) {
                     </p>
                     {n.errorMessage && (
                       <p className="mt-1 text-xs text-destructive">{n.errorMessage}</p>
+                    )}
+                    {(logs[n.nodeId]?.length ?? 0) > 0 && (
+                      <pre className="mt-2 max-h-40 overflow-auto rounded bg-black/90 p-2 font-mono text-xs text-green-400">
+                        {logs[n.nodeId].join("\n")}
+                      </pre>
                     )}
                     {(n.request != null || n.response != null) && (
                       <details className="mt-2">

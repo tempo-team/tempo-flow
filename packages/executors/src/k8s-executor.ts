@@ -95,8 +95,11 @@ export class K8sExecutor implements JobExecutor {
     const manifest = buildJobManifest(node, params, { jobName })
     const namespace = cfg.namespace ?? DEFAULT_NAMESPACE
 
+    ctx.onLog?.(`→ launching Job ${jobName} (${cfg.image}) in ${namespace}`)
     try {
       const result = await this.runner.run(manifest, namespace)
+      if (result.logs) for (const line of result.logs.split("\n")) ctx.onLog?.(line)
+      ctx.onLog?.(`← exit ${result.exitCode ?? "?"}`)
       const response = {
         jobName,
         namespace,

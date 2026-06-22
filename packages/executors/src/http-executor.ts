@@ -39,6 +39,7 @@ export class HttpExecutor implements JobExecutor {
     const timeoutMs = node.timeoutMs ?? DEFAULT_TIMEOUT_MS
     const timer = setTimeout(() => controller.abort(), timeoutMs)
 
+    ctx.onLog?.(`→ ${cfg.method} ${url.toString()}`)
     try {
       const res = await this.fetchImpl(url.toString(), {
         method: cfg.method,
@@ -48,17 +49,16 @@ export class HttpExecutor implements JobExecutor {
       })
       const text = await res.text()
       const response = { status: res.status, body: text }
+      ctx.onLog?.(`← ${res.status} (${text.length} bytes)`)
       if (!res.ok) {
         return { ok: false, request, response, errorMessage: `HTTP ${res.status}` }
       }
       return { ok: true, request, response }
     } catch (err) {
       const aborted = err instanceof Error && err.name === "AbortError"
-      return {
-        ok: false,
-        request,
-        errorMessage: aborted ? `timeout after ${timeoutMs}ms` : (err as Error).message,
-      }
+      const message = aborted ? `timeout after ${timeoutMs}ms` : (err as Error).message
+      ctx.onLog?.(`✗ ${message}`)
+      return { ok: false, request, errorMessage: message }
     } finally {
       clearTimeout(timer)
     }
