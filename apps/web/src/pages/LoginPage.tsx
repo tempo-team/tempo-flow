@@ -1,13 +1,14 @@
 // Copyright 2026 The tempo-flow Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { type FormEvent, useState } from "react"
+import { type FormEvent, useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
 export function LoginPage() {
@@ -17,6 +18,14 @@ export function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [ssoEnabled, setSsoEnabled] = useState(false)
+
+  useEffect(() => {
+    api
+      .ssoStatus()
+      .then((s) => setSsoEnabled(s.oidc))
+      .catch(() => undefined)
+  }, [])
 
   async function onSubmit(e: FormEvent): Promise<void> {
     e.preventDefault()
@@ -83,6 +92,24 @@ export function LoginPage() {
               Sign in
             </Button>
           </form>
+          {ssoEnabled && (
+            <>
+              <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="h-px flex-1 bg-border" /> or{" "}
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  window.location.href = api.oidcLoginUrl()
+                }}
+              >
+                Sign in with SSO
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

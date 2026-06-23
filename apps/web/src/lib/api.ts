@@ -254,6 +254,10 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  // --- sso ---
+  ssoStatus: () => request<{ oidc: boolean }>("/auth/sso"),
+  oidcLoginUrl: () => `${BASE}/auth/oidc/login`,
+
   // --- secrets (value is write-only; never returned) ---
   listSecrets: () => request<SecretSummary[]>("/secrets"),
   upsertSecret: (body: { key: string; value: string }) =>

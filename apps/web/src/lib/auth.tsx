@@ -32,6 +32,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Capture an SSO token handed back by the OIDC callback redirect.
+    const params = new URLSearchParams(window.location.search)
+    const ssoToken = params.get("sso_token")
+    if (ssoToken) {
+      setToken(ssoToken)
+      params.delete("sso_token")
+      const qs = params.toString()
+      window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""))
+    }
+
     if (!getToken()) {
       setLoading(false)
       return
