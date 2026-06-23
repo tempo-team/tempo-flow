@@ -3,7 +3,7 @@
 
 import type { FlowNode, HttpExecutorConfig } from "@tempo-flow/shared-types"
 import type { ExecResult, JobExecutor, RunContext } from "./executor.js"
-import { resolveNodeParams } from "./params.js"
+import { resolveNodeParams, resolveValueExpr } from "./params.js"
 
 const DEFAULT_TIMEOUT_MS = 30_000
 
@@ -31,7 +31,18 @@ export class HttpExecutor implements JobExecutor {
 
     const url = new URL(cfg.url)
     let body: string | undefined
-    const headers: Record<string, string> = { ...(cfg.headers ?? {}) }
+    // Resolve `={{ secrets.X }}` / `={{ params.Y }}` expressions in header values.
+    const exprCtx = {
+      runDate: ctx.runDate,
+      params,
+      nodes: ctx.nodeOutputs,
+      secrets: ctx.secrets,
+      item: ctx.item,
+    }
+    const headers: Record<string, string> = {}
+    for (const [k, v] of Object.entries(cfg.headers ?? {})) {
+      headers[k] = await resolveValueExpr(v, exprCtx)
+    }
 
     // Callback mode: tell the external job where to report its real completion.
     // Sent both as headers and merged params so simple receivers can read either.

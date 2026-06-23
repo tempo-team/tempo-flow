@@ -123,13 +123,38 @@ export async function resolveNodeParams(
  */
 export async function evaluateExpression(
   expr: string,
-  ctx: { runDate: Date; params?: Record<string, string>; nodes?: Record<string, unknown> },
+  ctx: {
+    runDate: Date
+    params?: Record<string, string>
+    nodes?: Record<string, unknown>
+    secrets?: Record<string, string>
+    item?: unknown
+  },
 ): Promise<unknown> {
   const context = {
     runDate: ctx.runDate.toISOString(),
     now: new Date().toISOString(),
     params: ctx.params ?? {},
     nodes: ctx.nodes ?? {},
+    secrets: ctx.secrets ?? {},
+    item: ctx.item,
   }
   return jsonata(expr).evaluate(context)
+}
+
+/** Resolve a single value: if it is `={{ expr }}`, evaluate it; else return as-is. */
+export async function resolveValueExpr(
+  value: string,
+  ctx: {
+    runDate: Date
+    params?: Record<string, string>
+    nodes?: Record<string, unknown>
+    secrets?: Record<string, string>
+    item?: unknown
+  },
+): Promise<string> {
+  const match = /^=\{\{([\s\S]+)\}\}$/.exec(value)
+  if (!match) return value
+  const out = await evaluateExpression(match[1].trim(), ctx)
+  return out == null ? "" : typeof out === "object" ? JSON.stringify(out) : String(out)
 }
