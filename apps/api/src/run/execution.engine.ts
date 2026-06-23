@@ -16,6 +16,7 @@ import {
   type RunContext,
   evaluateExpression,
 } from "@tempo-flow/executors"
+import { maskValues } from "../common/mask"
 
 export interface NodeRunRecord {
   id: string
@@ -101,6 +102,18 @@ export interface EngineOptions {
 const DEFAULT_CALLBACK_TIMEOUT_MS = 30 * 60 * 1000
 /** Default max concurrent fan-out instances. */
 const DEFAULT_FOREACH_CONCURRENCY = 5
+/** Bound `forEach` JSONata evaluation so a bad expression can't hang advance. */
+const FOREACH_EVAL_TIMEOUT_MS = 5000
+
+/** Reject if `p` does not settle within `ms` (the underlying work isn't canceled). */
+function raceWithTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ])
+}
 
 // No-op when OTel is not configured (getTracer returns a no-op tracer).
 const tracer = trace.getTracer("tempo-flow")
@@ -126,20 +139,6 @@ function buildNodeOutputs(definition: FlowDefinition, raw: NodeOutput[]): Record
     result[nodeId] = { output }
   }
   return result
-}
-
-/**
- * Replace every secret value occurring in a recorded request with `***` so
- * plaintext is never persisted (HTTP headers/body/query that interpolated a
- * `secrets.*` expression). Done on the serialized form to catch nested values.
- */
-function maskSecrets(request: unknown, secrets?: Record<string, string>): unknown {
-  if (request === undefined || !secrets) return request
-  const values = Object.values(secrets).filter((v) => v.length > 0)
-  if (values.length === 0) return request
-  let json = JSON.stringify(request)
-  for (const v of values) json = json.split(JSON.stringify(v).slice(1, -1)).join("***")
-  return JSON.parse(json)
 }
 
 function groupByNode(states: NodeState[]): Map<string, NodeState[]> {
@@ -276,14 +275,20 @@ export class ExecutionEngine {
       return
     }
 
-    // Fan-out: evaluate the array, then run one instance per item.
+    // Fan-out: evaluate the array, then run one instance per item. Bounded by a
+    // timeout so a pathological expression can't hang the worker's advance.
     let items: unknown
     try {
-      items = await evaluateExpression(node.forEach, {
-        runDate: args.runDate,
-        params: args.params,
-        nodes: nodeOutputs,
-      })
+      items = await raceWithTimeout(
+        evaluateExpression(node.forEach, {
+          runDate: args.runDate,
+          params: args.params,
+          nodes: nodeOutputs,
+          secrets: args.secrets,
+        }),
+        FOREACH_EVAL_TIMEOUT_MS,
+        "forEach expression",
+      )
     } catch (err) {
       await this.recordSentinel(
         node,
@@ -368,9 +373,12 @@ export class ExecutionEngine {
         callback,
       }
       const { result, attempt } = await this.executeWithRetry(node, ctx)
-      // Never persist secret plaintext: mask any secret value out of what we store.
-      const request = maskSecrets(result.request, args.secrets)
-      const response = maskSecrets(result.response, args.secrets)
+      // Never persist plaintext: mask secret values AND the one-time callback
+      // token (which appears in the request headers/params/URL) out of what we
+      // store. Output is masked too so a script that echoes a secret can't leak it.
+      const sensitive = [...Object.values(args.secrets ?? {}), callback?.token]
+      const request = maskValues(result.request, sensitive)
+      const response = maskValues(result.response, sensitive)
 
       if (completionMode === "callback" && result.ok) {
         // Trigger accepted — suspend until the external job reports completion.
@@ -392,7 +400,7 @@ export class ExecutionEngine {
         attempt,
         request,
         response,
-        output: result.output,
+        output: maskValues(result.output, sensitive),
         errorMessage: result.errorMessage,
       })
       span.end()

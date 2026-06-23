@@ -52,7 +52,11 @@ export class OidcService {
         const res = await fetch(`${issuer}/.well-known/openid-configuration`)
         if (!res.ok) throw new Error(`OIDC discovery failed (${res.status})`)
         return (await res.json()) as OidcDiscovery
-      })()
+      })().catch((err) => {
+        // Don't cache a transient failure — otherwise SSO stays broken until restart.
+        this.discoveryCache = undefined
+        throw err
+      })
     }
     return this.discoveryCache
   }
@@ -135,29 +139,40 @@ export class OidcService {
   }
 
   /**
-   * Find-or-create the user by email and make their roles match the mapped set
-   * (the IdP is the source of truth for SSO users). Unknown role names are
-   * skipped. SSO users get a random, unusable password hash.
+   * Find-or-create the user by email. For SSO-managed users the IdP is the source
+   * of truth, so their roles are made to match the mapped set. A pre-existing
+   * *local* user (password-based, not provisioned by us) is NOT role-clobbered —
+   * otherwise an admin who happens to share an email would be downgraded on SSO
+   * login. Unknown role names are skipped. SSO users get an unusable password hash.
    */
   async provisionUser(
     email: string,
     name: string | undefined,
     roleNames: string[],
   ): Promise<string> {
-    const user = await this.prisma.user.upsert({
-      where: { email },
-      create: {
-        email,
-        name: name ?? null,
-        passwordHash: `oidc:${randomBytes(24).toString("hex")}`,
-        active: true,
-      },
-      update: name ? { name } : {},
-    })
-    const roles = await this.prisma.role.findMany({ where: { name: { in: roleNames } } })
-    await this.prisma.userRole.deleteMany({ where: { userId: user.id } })
-    for (const role of roles) {
-      await this.prisma.userRole.create({ data: { userId: user.id, roleId: role.id } })
+    const existing = await this.prisma.user.findUnique({ where: { email } })
+    const oidcManaged = !existing || existing.passwordHash.startsWith("oidc:")
+
+    const user = existing
+      ? await this.prisma.user.update({
+          where: { id: existing.id },
+          data: name ? { name } : {},
+        })
+      : await this.prisma.user.create({
+          data: {
+            email,
+            name: name ?? null,
+            passwordHash: `oidc:${randomBytes(24).toString("hex")}`,
+            active: true,
+          },
+        })
+
+    if (oidcManaged) {
+      const roles = await this.prisma.role.findMany({ where: { name: { in: roleNames } } })
+      await this.prisma.userRole.deleteMany({ where: { userId: user.id } })
+      for (const role of roles) {
+        await this.prisma.userRole.create({ data: { userId: user.id, roleId: role.id } })
+      }
     }
     return user.id
   }

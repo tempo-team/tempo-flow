@@ -47,13 +47,14 @@ describe("OidcService.mapRolesFromGroups", () => {
 })
 
 describe("OidcService.provisionUser", () => {
-  it("creates the user (random pw), replaces roles with the mapped set", async () => {
-    const upsert = vi.fn().mockResolvedValue({ id: "u1" })
+  it("creates a new user (random pw) and assigns the mapped roles", async () => {
+    const findUnique = vi.fn().mockResolvedValue(null) // new user
+    const userCreate = vi.fn().mockResolvedValue({ id: "u1" })
     const roleFindMany = vi.fn().mockResolvedValue([{ id: "r-admin" }])
     const deleteMany = vi.fn().mockResolvedValue({ count: 0 })
     const create = vi.fn().mockResolvedValue({})
     const prisma = {
-      user: { upsert },
+      user: { findUnique, create: userCreate },
       role: { findMany: roleFindMany },
       userRole: { deleteMany, create },
     } as unknown as PrismaService
@@ -61,10 +62,26 @@ describe("OidcService.provisionUser", () => {
 
     const id = await svc.provisionUser("a@b.com", "Alice", ["admin"])
     expect(id).toBe("u1")
-    // SSO user has a non-password hash
-    expect(upsert.mock.calls[0][0].create.passwordHash).toMatch(/^oidc:/)
-    // roles replaced (delete then add the mapped role that exists)
+    expect(userCreate.mock.calls[0][0].data.passwordHash).toMatch(/^oidc:/)
     expect(deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } })
     expect(create).toHaveBeenCalledWith({ data: { userId: "u1", roleId: "r-admin" } })
+  })
+
+  it("does NOT clobber the roles of a pre-existing local (password) user", async () => {
+    const findUnique = vi.fn().mockResolvedValue({ id: "u9", passwordHash: "$2b$bcrypthash" })
+    const userUpdate = vi.fn().mockResolvedValue({ id: "u9" })
+    const deleteMany = vi.fn()
+    const create = vi.fn()
+    const prisma = {
+      user: { findUnique, update: userUpdate },
+      role: { findMany: vi.fn() },
+      userRole: { deleteMany, create },
+    } as unknown as PrismaService
+    const svc = build({}, prisma)
+
+    const id = await svc.provisionUser("admin@local", "Admin", ["viewer"])
+    expect(id).toBe("u9")
+    expect(deleteMany).not.toHaveBeenCalled() // local user's roles preserved
+    expect(create).not.toHaveBeenCalled()
   })
 })

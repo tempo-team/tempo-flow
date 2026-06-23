@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest"
 import type { RunEventsService } from "../events/run-events.service"
 import type { PrismaService } from "../prisma/prisma.service"
 import type { QueueService } from "../queue/queue.service"
+import type { SecretService } from "../secret/secret.service"
 import { CallbackService } from "./callback.service"
 
 const TOKEN = "secret-token"
@@ -30,7 +31,13 @@ function build(node: { status: RunStatus } | null) {
   const prisma = { nodeRun: { findUnique, updateMany } } as unknown as PrismaService
   const events = { publish } as unknown as RunEventsService
   const queue = { enqueueResume } as unknown as QueueService
-  return { svc: new CallbackService(prisma, events, queue), findUnique, updateMany, enqueueResume }
+  const secrets = { resolveForFlow: vi.fn().mockResolvedValue({}) } as unknown as SecretService
+  return {
+    svc: new CallbackService(prisma, events, queue, secrets),
+    findUnique,
+    updateMany,
+    enqueueResume,
+  }
 }
 
 describe("CallbackService.report", () => {

@@ -4,9 +4,11 @@
 import { createHash } from "node:crypto"
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { type FlowDefinition, RunStatus, fromJson, toJson } from "@tempo-flow/shared-types"
+import { maskValues } from "../common/mask"
 import { RunEventsService } from "../events/run-events.service"
 import { PrismaService } from "../prisma/prisma.service"
 import { QueueService } from "../queue/queue.service"
+import { SecretService } from "../secret/secret.service"
 import type { CallbackReportRequest } from "./dto/callback.request"
 
 const DEFAULT_CALLBACK_TIMEOUT_MS = 30 * 60 * 1000
@@ -26,6 +28,7 @@ export class CallbackService {
     private readonly prisma: PrismaService,
     private readonly runEvents: RunEventsService,
     private readonly queue: QueueService,
+    private readonly secrets: SecretService,
   ) {}
 
   async report(token: string, body: CallbackReportRequest): Promise<{ ok: true }> {
@@ -36,12 +39,16 @@ export class CallbackService {
     if (node.status !== RunStatus.WaitingCallback) return { ok: true }
 
     const status = body.status === "success" ? RunStatus.Success : RunStatus.Failed
+    // Scrub any secret value the job echoed back in its output before persisting.
+    const secrets = await this.secrets.resolveForFlow(node.flowRun.flowId)
+    const output =
+      body.output === undefined ? null : toJson(maskValues(body.output, Object.values(secrets)))
     // Conditional update = the race guard: only one callback/timeout wins.
     const res = await this.prisma.nodeRun.updateMany({
       where: { id: node.id, status: RunStatus.WaitingCallback },
       data: {
         status,
-        output: body.output === undefined ? null : toJson(body.output),
+        output,
         errorMessage: body.errorMessage,
         finishedAt: new Date(),
       },

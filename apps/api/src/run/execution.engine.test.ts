@@ -271,6 +271,47 @@ describe("ExecutionEngine.advance", () => {
     expect(rows.get("a:0")?.status).toBe(RunStatus.Success)
   })
 
+  it("masks the one-time callback token out of the recorded request", async () => {
+    const def: FlowDefinition = { nodes: [node("a", { completion: "callback" })], edges: [] }
+    const { rec } = recorder()
+    // Executor echoes the callback token it was handed (as the http executor does).
+    const exec: JobExecutor = {
+      type: "http",
+      async execute(_n, ctx): Promise<ExecResult> {
+        return { ok: true, request: { headers: { "x-tempo-callback-token": ctx.callback?.token } } }
+      },
+    }
+    let persisted: unknown
+    const orig = rec.updateNodeRun
+    rec.updateNodeRun = async (id, patch) => {
+      persisted = patch.request
+      return orig(id, patch)
+    }
+    const engine = new ExecutionEngine(
+      { http: exec },
+      { sleep: async () => {}, callbackBaseUrl: "https://host", genToken: () => "tok-abc123" },
+    )
+    const result = await engine.advance(args(rec, def))
+    expect(result.waiting).toBe(true)
+    expect(JSON.stringify(persisted)).not.toContain("tok-abc123")
+    expect(JSON.stringify(persisted)).toContain("***")
+  })
+
+  it("masks secret values out of a node's output", async () => {
+    const def: FlowDefinition = { nodes: [node("a")], edges: [] }
+    const { rec, rows } = recorder()
+    const exec: JobExecutor = {
+      type: "http",
+      async execute(): Promise<ExecResult> {
+        return { ok: true, output: { token: "s3cr3t", note: "ok" } }
+      },
+    }
+    const engine = new ExecutionEngine({ http: exec }, { sleep: async () => {} })
+    await engine.advance({ ...args(rec, def), secrets: { TOKEN: "s3cr3t" } })
+    expect(JSON.stringify(rows.get("a:0")?.output)).not.toContain("s3cr3t")
+    expect(JSON.stringify(rows.get("a:0")?.output)).toContain("***")
+  })
+
   it("does not double-claim a node across concurrent advances", async () => {
     const def: FlowDefinition = { nodes: [node("a")], edges: [] }
     const { rec } = recorder()

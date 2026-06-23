@@ -3,11 +3,12 @@
 
 import { Module } from "@nestjs/common"
 import { QueueModule } from "../queue/queue.module"
+import { SecretModule } from "../secret/secret.module"
 import { CallbackController } from "./callback.controller"
 import { CallbackService } from "./callback.service"
 
 @Module({
-  imports: [QueueModule],
+  imports: [QueueModule, SecretModule],
   controllers: [CallbackController],
   providers: [CallbackService],
 })

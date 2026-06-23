@@ -14,6 +14,8 @@ import {
 const MEMORY = "512m"
 const CPUS = "1"
 const PIDS = "256"
+/** Max stdout/stderr retained in memory per script (live logs stream uncapped). */
+const MAX_CAPTURE_BYTES = 1_000_000
 
 /**
  * Runs each script as a one-shot, isolated container via the Docker CLI
@@ -63,12 +65,20 @@ export class DockerScriptRunner implements ScriptRunner {
         child.kill("SIGKILL")
       }, spec.timeoutMs)
 
+      // Cap retained output so a chatty script can't exhaust worker memory; live
+      // log lines are still streamed in full via onLog. Keep the TAIL — the
+      // node's JSON output and the last error line are at the end of the stream.
+      const append = (cur: string, chunk: string): string => {
+        const next = cur + chunk
+        return next.length > MAX_CAPTURE_BYTES ? next.slice(next.length - MAX_CAPTURE_BYTES) : next
+      }
+
       child.stdout.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString()
+        stdout = append(stdout, chunk.toString())
         for (const line of chunk.toString().split("\n")) if (line) spec.onLog?.(line)
       })
       child.stderr.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString()
+        stderr = append(stderr, chunk.toString())
         for (const line of chunk.toString().split("\n")) if (line) spec.onLog?.(line)
       })
       child.on("error", (err) => {

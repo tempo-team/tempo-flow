@@ -152,11 +152,17 @@ export class RunService implements NodeRunRecorder {
     const meta = fromJson<RunMeta>(run.params, {})
     const runDate = meta.runDate ? new Date(meta.runDate) : new Date()
 
-    if (!resume) {
-      // Fresh start (or idempotent BullMQ retry of a never-suspended run): clear
-      // any NodeRuns from a prior attempt so we never accumulate duplicate rows.
-      // A resume must NOT delete — the persisted NodeRuns ARE the checkpoint.
-      await this.prisma.nodeRun.deleteMany({ where: { flowRunId } })
+    // Clear only *in-flight* node instances left by a dead attempt (e.g. a worker
+    // crash mid-node, surfacing as a BullMQ retry). Terminal results are kept (no
+    // duplicate work) and — crucially — WAITING_CALLBACK rows are kept so their
+    // live external jobs can still call back. Deleting everything here would
+    // orphan callbacks and re-trigger external work.
+    await this.prisma.nodeRun.deleteMany({
+      where: { flowRunId, status: RunStatus.Running },
+    })
+
+    // Fresh start: the run is still PENDING. Resumes/retries are already RUNNING.
+    if (run.status === RunStatus.Pending) {
       await this.prisma.flowRun.update({
         where: { id: flowRunId },
         data: { status: RunStatus.Running, startedAt: new Date() },
@@ -169,6 +175,7 @@ export class RunService implements NodeRunRecorder {
         at: new Date().toISOString(),
       })
     }
+    void resume // informational only; correctness keys off run.status now
 
     // Decrypted secrets are injected into node executions (env / `secrets.*`
     // expressions) and masked out of recorded requests — never persisted plain.
