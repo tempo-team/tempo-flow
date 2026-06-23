@@ -25,6 +25,7 @@ import {
 import { RunEventsService } from "../events/run-events.service"
 import { FLOW_RUN_FINISHED, type FlowRunFinishedEvent } from "../notification/notification.listener"
 import { PrismaService } from "../prisma/prisma.service"
+import { SecretService } from "../secret/secret.service"
 import { ExecutionEngine, type NodeRunRecorder } from "./execution.engine"
 import { RunLauncherService } from "./run-launcher.service"
 import { SubflowExecutor } from "./subflow.executor"
@@ -46,6 +47,7 @@ export class RunService implements NodeRunRecorder {
     private readonly events: EventEmitter2,
     private readonly runEvents: RunEventsService,
     private readonly config: ConfigService,
+    private readonly secrets: SecretService,
   ) {
     // K8s runner lazily loads kube config on first use, so constructing it here
     // does not require a cluster to be reachable at boot.
@@ -167,11 +169,16 @@ export class RunService implements NodeRunRecorder {
       })
     }
 
+    // Decrypted secrets are injected into node executions (env / `secrets.*`
+    // expressions) and masked out of recorded requests — never persisted plain.
+    const secrets = await this.secrets.resolveForFlow(run.flowId)
+
     const result = await this.engine.advance({
       flowRunId,
       definition,
       runDate,
       params: meta.params,
+      secrets,
       recorder: this,
     })
 

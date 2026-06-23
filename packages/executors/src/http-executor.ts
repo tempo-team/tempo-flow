@@ -25,6 +25,7 @@ export class HttpExecutor implements JobExecutor {
       overrides: ctx.params,
       item: ctx.item,
       nodes: ctx.nodeOutputs,
+      secrets: ctx.secrets,
     })
     const paramsIn = cfg.paramsIn ?? "query"
 

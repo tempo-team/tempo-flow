@@ -32,6 +32,8 @@ export interface RunContext {
   mapIndex?: number
   /** Upstream node outputs by node id, for `nodes.<id>.output` expressions. */
   nodeOutputs?: Record<string, unknown>
+  /** Decrypted secrets for `={{ secrets.KEY }}` and script env injection. */
+  secrets?: Record<string, string>
 }
 
 /** Result of executing one node. */

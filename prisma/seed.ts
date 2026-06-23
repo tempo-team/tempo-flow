@@ -33,6 +33,7 @@ const PERMISSIONS: Perm[] = [
   { action: "manage", resource: "user" },
   { action: "manage", resource: "setting" },
   { action: "view", resource: "setting" },
+  { action: "manage", resource: "secret" },
 ]
 
 const ROLE_PERMISSIONS: Record<string, Perm[] | "all"> = {

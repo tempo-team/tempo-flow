@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { type ReactNode, useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { type NotificationConfig, api } from "@/lib/api"
+import { type NotificationConfig, type SecretSummary, api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 
 const MASK = "********"
@@ -288,7 +288,98 @@ export function SettingsPage() {
           </Button>
         </div>
       )}
+
+      {can("manage", "secret") && <SecretsCard />}
     </div>
+  )
+}
+
+/** Manage named secrets injected into node executions (values are write-only). */
+function SecretsCard() {
+  const [secrets, setSecrets] = useState<SecretSummary[]>([])
+  const [key, setKey] = useState("")
+  const [value, setValue] = useState("")
+  const [busy, setBusy] = useState(false)
+
+  function reload(): void {
+    api
+      .listSecrets()
+      .then(setSecrets)
+      .catch(() => undefined)
+  }
+  useEffect(reload, [])
+
+  async function add(): Promise<void> {
+    if (!key.trim() || !value) return
+    setBusy(true)
+    try {
+      await api.upsertSecret({ key: key.trim(), value })
+      setKey("")
+      setValue("")
+      reload()
+      toast.success(`Secret "${key.trim()}" saved`)
+    } catch (e) {
+      toast.error("Save failed", { description: (e as Error).message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove(id: string): Promise<void> {
+    await api.deleteSecret(id).catch(() => undefined)
+    reload()
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Secrets</CardTitle>
+        <CardDescription>
+          Injected into node executions as env vars and <code>={"{{ secrets.KEY }}"}</code>{" "}
+          expressions. Values are write-only — never shown again.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {secrets.length > 0 && (
+          <div className="divide-y rounded-md border">
+            {secrets.map((s) => (
+              <div key={s.id} className="flex items-center justify-between px-3 py-2">
+                <div>
+                  <span className="font-mono text-sm">{s.key}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    updated {new Date(s.updatedAt).toLocaleString()}
+                  </span>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => remove(s.id)}>
+                  <Trash2 className="size-4 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+          <Field label="Key">
+            <Input
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder="DB_PASSWORD"
+              className="font-mono"
+            />
+          </Field>
+          <Field label="Value">
+            <Input
+              type="password"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="••••••••"
+            />
+          </Field>
+          <Button onClick={add} disabled={busy || !key.trim() || !value}>
+            Add
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

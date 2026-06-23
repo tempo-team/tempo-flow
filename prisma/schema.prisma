@@ -194,3 +194,21 @@ model SystemSetting {
   key   String @id
   value String // JSON payload (e.g. notification channel config, encrypted secrets)
 }
+
+/**
+ * A named secret injected into node executions at run time. Value is stored
+ * AES-256-GCM encrypted and never returned by the API (write-only).
+ */
+model Secret {
+  id        String   @id @default(cuid())
+  scope     String   @default("global") // "global" | "flow"
+  flowId    String   @default("") // "" for global scope
+  key       String
+  valueEnc  String // AES-256-GCM ciphertext
+  createdBy String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([scope, flowId, key])
+  @@index([scope, flowId])
+}

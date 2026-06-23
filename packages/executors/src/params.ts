@@ -74,6 +74,8 @@ export interface ParamContext {
   item?: unknown
   /** Upstream node outputs by node id (`nodes.<id>.output` style access). */
   nodes?: Record<string, unknown>
+  /** Secrets available to `={{ secrets.KEY }}` expressions. */
+  secrets?: Record<string, string>
 }
 
 /**
@@ -100,6 +102,7 @@ export async function resolveNodeParams(
     params: { ...result },
     item: ctx.item,
     nodes: ctx.nodes ?? {},
+    secrets: ctx.secrets ?? {},
   }
   for (const [key, value] of Object.entries(result)) {
     const match = /^=\{\{([\s\S]+)\}\}$/.exec(value)

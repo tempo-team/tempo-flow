@@ -95,6 +95,7 @@ export class K8sExecutor implements JobExecutor {
       overrides: ctx.params,
       item: ctx.item,
       nodes: ctx.nodeOutputs,
+      secrets: ctx.secrets,
     })
     const jobName = k8sName(node.id, ctx.flowRunId)
     const manifest = buildJobManifest(node, params, { jobName })

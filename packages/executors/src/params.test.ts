@@ -94,4 +94,18 @@ describe("resolveNodeParams", () => {
     })
     expect(params.region).toBe("kr")
   })
+
+  it("resolves a secret via ={{ secrets.KEY }}", async () => {
+    const secretNode: FlowNode = {
+      id: "n5",
+      name: "x",
+      executor: { type: "http", url: "https://x.test/r", method: "POST" },
+      params: { static: { auth: '={{ "Bearer " & secrets.TOKEN }}' } },
+    }
+    const params = await resolveNodeParams(secretNode, {
+      runDate: BASE,
+      secrets: { TOKEN: "s3cr3t" },
+    })
+    expect(params.auth).toBe("Bearer s3cr3t")
+  })
 })

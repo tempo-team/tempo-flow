@@ -51,6 +51,7 @@ export class ScriptExecutor implements JobExecutor {
       overrides: ctx.params,
       item: ctx.item,
       nodes: ctx.nodeOutputs,
+      secrets: ctx.secrets,
     })
 
     const env: Record<string, string> = {
@@ -59,6 +60,8 @@ export class ScriptExecutor implements JobExecutor {
       TEMPO_NODE_ID: ctx.nodeId,
     }
     for (const [key, value] of Object.entries(params)) env[envKey(key)] = value
+    // Secrets are injected under their own names (script reads them from env).
+    for (const [key, value] of Object.entries(ctx.secrets ?? {})) env[key] = value
     if (ctx.item !== undefined) {
       env.TEMPO_ITEM = typeof ctx.item === "string" ? ctx.item : JSON.stringify(ctx.item)
       env.TEMPO_MAP_INDEX = String(ctx.mapIndex ?? 0)

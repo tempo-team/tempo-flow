@@ -74,6 +74,8 @@ export interface AdvanceArgs {
   definition: FlowDefinition
   runDate: Date
   params?: Record<string, string>
+  /** Decrypted secrets injected into executions; masked out of recorded requests. */
+  secrets?: Record<string, string>
   recorder: NodeRunRecorder
 }
 
@@ -120,6 +122,20 @@ function buildNodeOutputs(definition: FlowDefinition, raw: NodeOutput[]): Record
     result[nodeId] = { output }
   }
   return result
+}
+
+/**
+ * Replace every secret value occurring in a recorded request with `***` so
+ * plaintext is never persisted (HTTP headers/body/query that interpolated a
+ * `secrets.*` expression). Done on the serialized form to catch nested values.
+ */
+function maskSecrets(request: unknown, secrets?: Record<string, string>): unknown {
+  if (request === undefined || !secrets) return request
+  const values = Object.values(secrets).filter((v) => v.length > 0)
+  if (values.length === 0) return request
+  let json = JSON.stringify(request)
+  for (const v of values) json = json.split(JSON.stringify(v).slice(1, -1)).join("***")
+  return JSON.parse(json)
 }
 
 function groupByNode(states: NodeState[]): Map<string, NodeState[]> {
@@ -327,6 +343,7 @@ export class ExecutionEngine {
       nodeId: node.id,
       runDate: args.runDate,
       params: args.params,
+      secrets: args.secrets,
       item,
       mapIndex,
       nodeOutputs,
@@ -334,14 +351,17 @@ export class ExecutionEngine {
       callback,
     }
     const { result, attempt } = await this.executeWithRetry(node, ctx)
+    // Never persist secret plaintext: mask any secret value out of what we store.
+    const request = maskSecrets(result.request, args.secrets)
+    const response = maskSecrets(result.response, args.secrets)
 
     if (completionMode === "callback" && result.ok) {
       // Trigger accepted — suspend until the external job reports completion.
       await recorder.updateNodeRun(claimed.id, {
         status: RunStatus.WaitingCallback,
         attempt,
-        request: result.request,
-        response: result.response,
+        request,
+        response,
       })
       return
     }
@@ -349,8 +369,8 @@ export class ExecutionEngine {
     await recorder.updateNodeRun(claimed.id, {
       status: result.ok ? RunStatus.Success : RunStatus.Failed,
       attempt,
-      request: result.request,
-      response: result.response,
+      request,
+      response,
       output: result.output,
       errorMessage: result.errorMessage,
     })

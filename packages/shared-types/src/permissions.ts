@@ -25,6 +25,7 @@ export const Resource = {
   History: "history",
   User: "user",
   Setting: "setting",
+  Secret: "secret",
 } as const
 
 export type Resource = (typeof Resource)[keyof typeof Resource]

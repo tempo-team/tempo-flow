@@ -253,4 +253,19 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
+
+  // --- secrets (value is write-only; never returned) ---
+  listSecrets: () => request<SecretSummary[]>("/secrets"),
+  upsertSecret: (body: { key: string; value: string }) =>
+    request<SecretSummary>("/secrets", { method: "POST", body: JSON.stringify(body) }),
+  deleteSecret: (id: string) => request<void>(`/secrets/${id}`, { method: "DELETE" }),
+}
+
+export interface SecretSummary {
+  id: string
+  scope: string
+  flowId: string
+  key: string
+  createdBy: string
+  updatedAt: string
 }

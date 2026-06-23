@@ -5,6 +5,7 @@ import { Module } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { JwtModule } from "@nestjs/jwt"
 import { QueueModule } from "../queue/queue.module"
+import { SecretModule } from "../secret/secret.module"
 import { FlowProcessor } from "./flow.processor"
 import { RunController } from "./run.controller"
 import { RunLauncherModule } from "./run-launcher.module"
@@ -16,6 +17,7 @@ import { SseAuthGuard } from "./sse-auth.guard"
   imports: [
     QueueModule,
     RunLauncherModule,
+    SecretModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

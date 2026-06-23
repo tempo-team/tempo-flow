@@ -17,6 +17,7 @@ import { PrismaModule } from "./prisma/prisma.module"
 import { RedisModule } from "./redis/redis.module"
 import { RunModule } from "./run/run.module"
 import { SchedulerModule } from "./scheduler/scheduler.module"
+import { SecretModule } from "./secret/secret.module"
 import { SettingModule } from "./setting/setting.module"
 import { TriggerModule } from "./trigger/trigger.module"
 
@@ -38,6 +39,7 @@ import { TriggerModule } from "./trigger/trigger.module"
     NotificationModule,
     TriggerModule,
     CallbackModule,
+    SecretModule,
   ],
   controllers: [HealthController],
 })

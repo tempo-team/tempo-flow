@@ -247,6 +247,30 @@ describe("ExecutionEngine.advance", () => {
     expect(rows.get("map:1")?.output).toBe(2)
   })
 
+  it("masks secret values out of the recorded request", async () => {
+    const def: FlowDefinition = { nodes: [node("a")], edges: [] }
+    const { rec, rows } = recorder()
+    const exec: JobExecutor = {
+      type: "http",
+      async execute(): Promise<ExecResult> {
+        // executor echoes a request that embedded the secret value
+        return { ok: true, request: { headers: { authorization: "Bearer s3cr3t" } } }
+      },
+    }
+    // capture the request the recorder is asked to persist
+    let persisted: unknown
+    const orig = rec.updateNodeRun
+    rec.updateNodeRun = async (id, patch) => {
+      persisted = patch.request
+      return orig(id, patch)
+    }
+    const engine = new ExecutionEngine({ http: exec }, { sleep: async () => {} })
+    await engine.advance({ ...args(rec, def), secrets: { TOKEN: "s3cr3t" } })
+    expect(JSON.stringify(persisted)).toContain("***")
+    expect(JSON.stringify(persisted)).not.toContain("s3cr3t")
+    expect(rows.get("a:0")?.status).toBe(RunStatus.Success)
+  })
+
   it("does not double-claim a node across concurrent advances", async () => {
     const def: FlowDefinition = { nodes: [node("a")], edges: [] }
     const { rec } = recorder()
