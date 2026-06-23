@@ -7,6 +7,7 @@ import type {
   FlowNode,
   HttpExecutorConfig,
   K8sExecutorConfig,
+  ScriptExecutorConfig,
   SubflowExecutorConfig,
 } from "@tempo-flow/shared-types"
 import { Button } from "@/components/ui/button"
@@ -19,7 +20,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { defaultHttpExecutor, defaultK8sExecutor, defaultSubflowExecutor } from "./state"
+import {
+  defaultHttpExecutor,
+  defaultK8sExecutor,
+  defaultScriptExecutor,
+  defaultSubflowExecutor,
+} from "./state"
 import { KeyValueEditor } from "./KeyValueEditor"
 
 interface Props {
@@ -32,6 +38,7 @@ export function NodeForm({ node, onChange }: Props) {
   const http = node.executor as HttpExecutorConfig
   const k8s = node.executor as K8sExecutorConfig
   const subflow = node.executor as SubflowExecutorConfig
+  const script = node.executor as ScriptExecutorConfig
 
   function patch(p: Partial<FlowNode>): void {
     onChange({ ...node, ...p })
@@ -70,7 +77,9 @@ export function NodeForm({ node, onChange }: Props) {
                   ? defaultHttpExecutor()
                   : t === "k8s"
                     ? defaultK8sExecutor()
-                    : defaultSubflowExecutor(),
+                    : t === "script"
+                      ? defaultScriptExecutor()
+                      : defaultSubflowExecutor(),
             })
           }
         >
@@ -80,12 +89,55 @@ export function NodeForm({ node, onChange }: Props) {
           <SelectContent>
             <SelectItem value="http">HTTP</SelectItem>
             <SelectItem value="k8s">Kubernetes Job</SelectItem>
+            <SelectItem value="script">Script</SelectItem>
             <SelectItem value="subflow">Sub-flow</SelectItem>
           </SelectContent>
         </Select>
       </Field>
 
-      {node.executor.type === "subflow" ? (
+      {node.executor.type === "script" ? (
+        <div className="space-y-3 rounded-md border p-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Language">
+              <Select value={script.language} onValueChange={(l) => patchExecutor({ language: l })}>
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["python", "node", "bash", "go"].map((l) => (
+                    <SelectItem key={l} value={l}>
+                      {l}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Image (optional)">
+              <Input
+                value={script.image ?? ""}
+                onChange={(e) => patchExecutor({ image: e.target.value || undefined })}
+                placeholder="python:3.13-slim"
+                className="h-8"
+              />
+            </Field>
+          </div>
+          <Field label="Code">
+            <textarea
+              value={script.code}
+              onChange={(e) => patchExecutor({ code: e.target.value })}
+              rows={10}
+              spellCheck={false}
+              className="w-full rounded-md border bg-background p-2 font-mono text-xs"
+              placeholder="# params are in env as TF_PARAM_<KEY> and TEMPO_PARAMS (JSON)
+# print a final JSON line to set this node's output"
+            />
+          </Field>
+          <p className="text-xs text-muted-foreground">
+            Runs in an isolated container (no network by default). Params arrive as{" "}
+            <code>TF_PARAM_*</code> env vars; the last JSON line of stdout becomes the node output.
+          </p>
+        </div>
+      ) : node.executor.type === "subflow" ? (
         <div className="space-y-3 rounded-md border p-3">
           <Field label="Child flow id">
             <Input

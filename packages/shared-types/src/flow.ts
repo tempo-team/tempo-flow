@@ -6,7 +6,7 @@
  * renders and the execution engine interprets. Stored as JSON in Flow.definition.
  */
 
-export type ExecutorType = "http" | "k8s" | "subflow"
+export type ExecutorType = "http" | "k8s" | "subflow" | "script"
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 
@@ -35,7 +35,24 @@ export interface SubflowExecutorConfig {
   flowId: string
 }
 
-export type ExecutorConfig = HttpExecutorConfig | K8sExecutorConfig | SubflowExecutorConfig
+export type ScriptLanguage = "python" | "node" | "bash" | "go"
+
+export interface ScriptExecutorConfig {
+  type: "script"
+  language: ScriptLanguage
+  /** Inline source. Run in an isolated, per-execution container. */
+  code: string
+  /** Override the default base image for the language. */
+  image?: string
+  /** Allow the script container network access (default false — isolated). */
+  network?: boolean
+}
+
+export type ExecutorConfig =
+  | HttpExecutorConfig
+  | K8sExecutorConfig
+  | SubflowExecutorConfig
+  | ScriptExecutorConfig
 
 /** Reservation-date parameter: `key` = `expr` formatted with `format`. */
 export interface DateParam {

@@ -25,10 +25,19 @@ const subflowExecutorSchema = z.object({
   flowId: z.string().min(1),
 })
 
+const scriptExecutorSchema = z.object({
+  type: z.literal("script"),
+  language: z.enum(["python", "node", "bash", "go"]),
+  code: z.string().min(1),
+  image: z.string().min(1).optional(),
+  network: z.boolean().optional(),
+})
+
 const executorSchema = z.discriminatedUnion("type", [
   httpExecutorSchema,
   k8sExecutorSchema,
   subflowExecutorSchema,
+  scriptExecutorSchema,
 ])
 
 const dateParamSchema = z.object({

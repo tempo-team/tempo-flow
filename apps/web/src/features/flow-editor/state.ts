@@ -78,6 +78,10 @@ export function defaultSubflowExecutor(): ExecutorConfig {
   return { type: "subflow", flowId: "" }
 }
 
+export function defaultScriptExecutor(): ExecutorConfig {
+  return { type: "script", language: "python", code: "print('hello from tempo-flow')\n" }
+}
+
 /** A fresh node with a unique id within the definition. */
 export function newNode(def: FlowDefinition): FlowNode {
   let n = def.nodes.length + 1

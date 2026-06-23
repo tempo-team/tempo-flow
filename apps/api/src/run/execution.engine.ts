@@ -42,6 +42,7 @@ export interface NodeRunRecorder {
       attempt: number
       request?: unknown
       response?: unknown
+      output?: unknown
       errorMessage?: string
     },
   ): Promise<void>
@@ -207,6 +208,7 @@ export class ExecutionEngine {
       attempt,
       request: result.request,
       response: result.response,
+      output: result.output,
       errorMessage: result.errorMessage,
     })
   }

@@ -43,9 +43,13 @@ services:
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@tempo-flow.local}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin1234}
       WORKER_ENABLED: "true"
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
       PORT: "3000"
     ports:
       - "3000:3000"
+    # Inline-script nodes run as isolated containers via the host Docker daemon.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,7 +79,11 @@ services:
       # Worker replicas don't run migrations/seed; the api does.
       RUN_MIGRATIONS: "false"
       WORKER_ENABLED: "true"
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
       PORT: "3001"
+    # Inline-script nodes run as isolated containers via the host Docker daemon.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       api:
         condition: service_healthy

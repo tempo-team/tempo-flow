@@ -35,6 +35,8 @@ export interface ExecResult {
   request?: unknown
   /** Response / exit code / log summary (recorded into NodeRun.response). */
   response?: unknown
+  /** Structured result for downstream consumption (recorded into NodeRun.output). */
+  output?: unknown
   errorMessage?: string
 }
 

@@ -7,9 +7,11 @@ import { EventEmitter2 } from "@nestjs/event-emitter"
 import { Prisma } from "@prisma/client"
 import {
   DefaultK8sJobRunner,
+  DockerScriptRunner,
   HttpExecutor,
   type JobExecutor,
   K8sExecutor,
+  ScriptExecutor,
 } from "@tempo-flow/executors"
 import {
   type CompletionMode,
@@ -50,6 +52,10 @@ export class RunService implements NodeRunRecorder {
       http: new HttpExecutor(),
       k8s: new K8sExecutor(new DefaultK8sJobRunner()),
       subflow: new SubflowExecutor(this.launcher, this.prisma),
+      // Inline scripts run as isolated one-shot Docker containers (DooD).
+      script: new ScriptExecutor(
+        new DockerScriptRunner(this.config.get<string>("DOCKER_PATH") ?? "docker"),
+      ),
     }
     // Base URL handed to callback-mode jobs so they can report completion.
     const callbackBaseUrl = this.config.get<string>("PUBLIC_URL") ?? "http://localhost:3000"
@@ -275,6 +281,7 @@ export class RunService implements NodeRunRecorder {
       attempt: number
       request?: unknown
       response?: unknown
+      output?: unknown
       errorMessage?: string
     },
   ): Promise<void> {
@@ -285,6 +292,7 @@ export class RunService implements NodeRunRecorder {
         attempt: patch.attempt,
         request: patch.request === undefined ? null : toJson(patch.request),
         response: patch.response === undefined ? null : toJson(patch.response),
+        output: patch.output === undefined ? undefined : toJson(patch.output),
         errorMessage: patch.errorMessage,
         // A node awaiting its callback is not finished yet.
         finishedAt: isTerminal(patch.status) ? new Date() : null,
