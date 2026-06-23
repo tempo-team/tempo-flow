@@ -34,6 +34,8 @@ export interface RunContext {
   nodeOutputs?: Record<string, unknown>
   /** Decrypted secrets for `={{ secrets.KEY }}` and script env injection. */
   secrets?: Record<string, string>
+  /** W3C trace context to hand to the job so its spans join this trace. */
+  traceparent?: string
 }
 
 /** Result of executing one node. */

@@ -70,6 +70,7 @@ export class ScriptExecutor implements JobExecutor {
       env.TEMPO_CALLBACK_URL = ctx.callback.url
       env.TEMPO_CALLBACK_TOKEN = ctx.callback.token
     }
+    if (ctx.traceparent) env.traceparent = ctx.traceparent
 
     const spec: ScriptRunSpec = {
       language: cfg.language,

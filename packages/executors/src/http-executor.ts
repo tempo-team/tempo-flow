@@ -44,6 +44,9 @@ export class HttpExecutor implements JobExecutor {
       headers[k] = await resolveValueExpr(v, exprCtx)
     }
 
+    // Distributed tracing: let the called service join this run's trace.
+    if (ctx.traceparent) headers.traceparent = ctx.traceparent
+
     // Callback mode: tell the external job where to report its real completion.
     // Sent both as headers and merged params so simple receivers can read either.
     if (ctx.callback) {

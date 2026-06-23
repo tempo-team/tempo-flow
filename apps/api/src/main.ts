@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import "reflect-metadata"
+// Start tracing before anything else so auto-instrumentation can patch modules.
+import { startTelemetry } from "./telemetry"
+
+startTelemetry()
+
 import { ValidationPipe } from "@nestjs/common"
 import { createBullBoard } from "@bull-board/api"
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter"

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createHash, randomBytes } from "node:crypto"
+import { SpanStatusCode, context as otelContext, propagation, trace } from "@opentelemetry/api"
 import {
   type CompletionMode,
   type FlowDefinition,
@@ -100,6 +101,9 @@ export interface EngineOptions {
 const DEFAULT_CALLBACK_TIMEOUT_MS = 30 * 60 * 1000
 /** Default max concurrent fan-out instances. */
 const DEFAULT_FOREACH_CONCURRENCY = 5
+
+// No-op when OTel is not configured (getTracer returns a no-op tracer).
+const tracer = trace.getTracer("tempo-flow")
 
 /**
  * Build the `nodes` context for expressions: a fan-out node (has `forEach`)
@@ -338,41 +342,60 @@ export class ExecutionEngine {
     })
     if (!claimed) return // another advance already claimed this instance
 
-    const ctx: RunContext = {
-      flowRunId: args.flowRunId,
-      nodeId: node.id,
-      runDate: args.runDate,
-      params: args.params,
-      secrets: args.secrets,
-      item,
-      mapIndex,
-      nodeOutputs,
-      onLog: (line) => recorder.nodeLog?.(args.flowRunId, node.id, line),
-      callback,
-    }
-    const { result, attempt } = await this.executeWithRetry(node, ctx)
-    // Never persist secret plaintext: mask any secret value out of what we store.
-    const request = maskSecrets(result.request, args.secrets)
-    const response = maskSecrets(result.response, args.secrets)
+    // One span per node instance; the job inherits its trace via `traceparent`.
+    await tracer.startActiveSpan(`node.run ${node.id}`, async (span) => {
+      span.setAttributes({
+        "tempo.flow_run_id": args.flowRunId,
+        "tempo.node_id": node.id,
+        "tempo.executor": node.executor.type,
+        "tempo.map_index": mapIndex,
+        "tempo.completion": completionMode,
+      })
+      const carrier: Record<string, string> = {}
+      propagation.inject(otelContext.active(), carrier)
 
-    if (completionMode === "callback" && result.ok) {
-      // Trigger accepted — suspend until the external job reports completion.
+      const ctx: RunContext = {
+        flowRunId: args.flowRunId,
+        nodeId: node.id,
+        runDate: args.runDate,
+        params: args.params,
+        secrets: args.secrets,
+        item,
+        mapIndex,
+        nodeOutputs,
+        traceparent: carrier.traceparent,
+        onLog: (line) => recorder.nodeLog?.(args.flowRunId, node.id, line),
+        callback,
+      }
+      const { result, attempt } = await this.executeWithRetry(node, ctx)
+      // Never persist secret plaintext: mask any secret value out of what we store.
+      const request = maskSecrets(result.request, args.secrets)
+      const response = maskSecrets(result.response, args.secrets)
+
+      if (completionMode === "callback" && result.ok) {
+        // Trigger accepted — suspend until the external job reports completion.
+        span.setAttribute("tempo.waiting_callback", true)
+        await recorder.updateNodeRun(claimed.id, {
+          status: RunStatus.WaitingCallback,
+          attempt,
+          request,
+          response,
+        })
+        span.end()
+        return
+      }
+
+      span.setStatus({ code: result.ok ? SpanStatusCode.OK : SpanStatusCode.ERROR })
+      if (!result.ok && result.errorMessage) span.recordException(new Error(result.errorMessage))
       await recorder.updateNodeRun(claimed.id, {
-        status: RunStatus.WaitingCallback,
+        status: result.ok ? RunStatus.Success : RunStatus.Failed,
         attempt,
         request,
         response,
+        output: result.output,
+        errorMessage: result.errorMessage,
       })
-      return
-    }
-
-    await recorder.updateNodeRun(claimed.id, {
-      status: result.ok ? RunStatus.Success : RunStatus.Failed,
-      attempt,
-      request,
-      response,
-      output: result.output,
-      errorMessage: result.errorMessage,
+      span.end()
     })
   }
 

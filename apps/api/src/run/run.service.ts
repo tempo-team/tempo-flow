@@ -1,6 +1,7 @@
 // Copyright 2026 The tempo-flow Authors
 // SPDX-License-Identifier: Apache-2.0
 
+import { trace } from "@opentelemetry/api"
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { EventEmitter2 } from "@nestjs/event-emitter"
@@ -173,13 +174,26 @@ export class RunService implements NodeRunRecorder {
     // expressions) and masked out of recorded requests — never persisted plain.
     const secrets = await this.secrets.resolveForFlow(run.flowId)
 
-    const result = await this.engine.advance({
-      flowRunId,
-      definition,
-      runDate,
-      params: meta.params,
-      secrets,
-      recorder: this,
+    const tracer = trace.getTracer("tempo-flow")
+    const result = await tracer.startActiveSpan(`flow.run ${run.flow.name}`, async (span) => {
+      span.setAttributes({
+        "tempo.flow_run_id": flowRunId,
+        "tempo.flow_id": run.flowId,
+        "tempo.trigger": run.trigger,
+        "tempo.resume": resume,
+      })
+      const r = await this.engine.advance({
+        flowRunId,
+        definition,
+        runDate,
+        params: meta.params,
+        secrets,
+        recorder: this,
+      })
+      span.setAttribute("tempo.waiting", r.waiting)
+      if (!r.waiting) span.setAttribute("tempo.status", r.status)
+      span.end()
+      return r
     })
 
     if (result.waiting) {
