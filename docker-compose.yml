@@ -44,6 +44,9 @@ services:
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin1234}
       WORKER_ENABLED: "true"
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      # Tracing is off unless an OTLP endpoint is set (e.g. http://jaeger:4318).
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-tempo-flow-api}
       PORT: "3000"
     ports:
       - "3000:3000"
@@ -80,6 +83,8 @@ services:
       RUN_MIGRATIONS: "false"
       WORKER_ENABLED: "true"
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-tempo-flow-worker}
       PORT: "3001"
     # Inline-script nodes run as isolated containers via the host Docker daemon.
     volumes:
@@ -97,6 +102,17 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  # Optional tracing backend: `docker compose --profile observability up jaeger`
+  # then set OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318 on api/worker.
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    profiles: ["observability"]
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # UI
+      - "4318:4318" # OTLP HTTP
 
 volumes:
   pgdata:
