@@ -85,6 +85,9 @@ export interface RetryPolicy {
  */
 export type CompletionMode = "sync" | "callback"
 
+/** How successors fire after a fan-out node's instances all finish. */
+export type JoinPolicy = "all" | "any" | "ratio"
+
 export interface FlowNode {
   id: string
   name: string
@@ -96,6 +99,18 @@ export interface FlowNode {
   completion?: CompletionMode
   /** callback mode: ms to wait for the callback before failing the node. */
   callbackTimeoutMs?: number
+  /**
+   * Fan-out: a JSONata expression (over `{ runDate, params, nodes }`) that
+   * evaluates to an array. One node instance runs per item, with `item` and
+   * `mapIndex` available in param expressions (`={{ item.id }}`).
+   */
+  forEach?: string
+  /** Max concurrent fan-out instances (default 5). */
+  forEachConcurrency?: number
+  /** When successors fire: all instances succeed (default), any, or a ratio. */
+  join?: JoinPolicy
+  /** Required success ratio (0..1) when `join` is "ratio". */
+  joinRatio?: number
 }
 
 export type EdgeCondition = "success" | "failure" | "always"

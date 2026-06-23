@@ -18,6 +18,7 @@ import {
   type FlowDefinition,
   RunStatus,
   fromJson,
+  fromJsonOpt,
   isTerminal,
   toJson,
 } from "@tempo-flow/shared-types"
@@ -214,6 +215,18 @@ export class RunService implements NodeRunRecorder {
       where: { flowRunId },
       select: { nodeId: true, mapIndex: true, status: true },
     }) as Promise<{ nodeId: string; mapIndex: number; status: RunStatus }[]>
+  }
+
+  async loadNodeOutputs(flowRunId: string) {
+    const rows = await this.prisma.nodeRun.findMany({
+      where: { flowRunId, output: { not: null } },
+      select: { nodeId: true, mapIndex: true, output: true },
+    })
+    return rows.map((r) => ({
+      nodeId: r.nodeId,
+      mapIndex: r.mapIndex,
+      output: fromJsonOpt(r.output) ?? null,
+    }))
   }
 
   /**

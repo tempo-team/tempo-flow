@@ -253,6 +253,32 @@ export function NodeForm({ node, onChange }: Props) {
         }
       />
 
+      <div className="grid grid-cols-2 gap-3 rounded-md border p-3">
+        <Field label="Fan-out (forEach JSONata → array)">
+          <Input
+            value={node.forEach ?? ""}
+            onChange={(e) => patch({ forEach: e.target.value || undefined })}
+            placeholder="nodes.list.output.ids"
+            className="h-8 font-mono"
+          />
+        </Field>
+        <Field label="Join">
+          <Select
+            value={node.join ?? "all"}
+            onValueChange={(j) => patch({ join: j === "all" ? undefined : (j as "any" | "ratio") })}
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">all succeed</SelectItem>
+              <SelectItem value="any">any succeeds</SelectItem>
+              <SelectItem value="ratio">success ratio</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">

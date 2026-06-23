@@ -66,6 +66,10 @@ export const flowNodeSchema = z.object({
   timeoutMs: z.number().int().positive().optional(),
   completion: z.enum(["sync", "callback"]).optional(),
   callbackTimeoutMs: z.number().int().positive().optional(),
+  forEach: z.string().min(1).optional(),
+  forEachConcurrency: z.number().int().positive().optional(),
+  join: z.enum(["all", "any", "ratio"]).optional(),
+  joinRatio: z.number().min(0).max(1).optional(),
 })
 
 export const flowEdgeSchema = z.object({

@@ -2,9 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createHash, randomBytes } from "node:crypto"
-import { type CompletionMode, type FlowDefinition, RunStatus } from "@tempo-flow/shared-types"
+import {
+  type CompletionMode,
+  type FlowDefinition,
+  type FlowNode,
+  RunStatus,
+} from "@tempo-flow/shared-types"
 import { getNode, incomingEdges } from "@tempo-flow/flow-engine"
-import type { ExecResult, JobExecutor, RunContext } from "@tempo-flow/executors"
+import {
+  type ExecResult,
+  type JobExecutor,
+  type RunContext,
+  evaluateExpression,
+} from "@tempo-flow/executors"
 
 export interface NodeRunRecord {
   id: string
@@ -17,10 +27,19 @@ export interface NodeState {
   status: RunStatus
 }
 
+/** A persisted node-instance output (callback- or executor-produced). */
+export interface NodeOutput {
+  nodeId: string
+  mapIndex: number
+  output: unknown
+}
+
 /** Persistence hook for node runs — implemented over Prisma in the app, mocked in tests. */
 export interface NodeRunRecorder {
   /** All NodeRun states for a run. The engine recomputes the frontier from these. */
   loadNodeStates(flowRunId: string): Promise<NodeState[]>
+  /** Raw per-instance outputs (the engine aggregates them per node definition). */
+  loadNodeOutputs(flowRunId: string): Promise<NodeOutput[]>
   /**
    * Claim a node for execution by inserting its NodeRun row. Returns the record,
    * or `null` if another advance already claimed it (unique-key conflict). This
@@ -77,6 +96,69 @@ export interface EngineOptions {
 
 /** Default ceiling for a callback that never arrives (overridable per node). */
 const DEFAULT_CALLBACK_TIMEOUT_MS = 30 * 60 * 1000
+/** Default max concurrent fan-out instances. */
+const DEFAULT_FOREACH_CONCURRENCY = 5
+
+/**
+ * Build the `nodes` context for expressions: a fan-out node (has `forEach`)
+ * exposes the array of its instance outputs ordered by mapIndex; a normal node
+ * exposes its single output.
+ */
+function buildNodeOutputs(definition: FlowDefinition, raw: NodeOutput[]): Record<string, unknown> {
+  const byNode = new Map<string, NodeOutput[]>()
+  for (const o of raw) {
+    const list = byNode.get(o.nodeId)
+    if (list) list.push(o)
+    else byNode.set(o.nodeId, [o])
+  }
+  const result: Record<string, unknown> = {}
+  for (const [nodeId, list] of byNode) {
+    list.sort((a, b) => a.mapIndex - b.mapIndex)
+    const node = getNode(definition, nodeId)
+    const output = node?.forEach ? list.map((o) => o.output) : list[0]?.output
+    // Exposed as nodes.<id>.output so expressions read `nodes.fetch.output.ids`.
+    result[nodeId] = { output }
+  }
+  return result
+}
+
+function groupByNode(states: NodeState[]): Map<string, NodeState[]> {
+  const map = new Map<string, NodeState[]>()
+  for (const s of states) {
+    const list = map.get(s.nodeId)
+    if (list) list.push(s)
+    else map.set(s.nodeId, [s])
+  }
+  return map
+}
+
+/**
+ * A node's single status across its (possibly fan-out) instances:
+ * - no instances → undefined (not started)
+ * - any instance still RUNNING/WAITING → undefined (in progress; gates successors)
+ * - all terminal → Success/Failed per the node's join policy (all|any|ratio).
+ */
+function aggregateStatus(
+  node: FlowNode | undefined,
+  instances: NodeState[],
+): RunStatus | undefined {
+  if (instances.length === 0) return undefined
+  const inProgress = instances.some(
+    (s) => s.status === RunStatus.Running || s.status === RunStatus.WaitingCallback,
+  )
+  if (inProgress) return undefined
+
+  const total = instances.length
+  const succ = instances.filter((s) => s.status === RunStatus.Success).length
+  const join = node?.join ?? "all"
+  const ok =
+    join === "any"
+      ? succ >= 1
+      : join === "ratio"
+        ? succ / total >= (node?.joinRatio ?? 1)
+        : succ === total
+  return ok ? RunStatus.Success : RunStatus.Failed
+}
 
 /**
  * Checkpoint-resume DAG engine. Rather than walking the whole DAG in one pass,
@@ -113,39 +195,46 @@ export class ExecutionEngine {
       const states = await recorder.loadNodeStates(args.flowRunId)
       const ready = this.computeReady(definition, states)
       if (ready.length === 0) break
-      for (const nodeId of ready) await this.runNode(nodeId, args)
+      const nodeOutputs = buildNodeOutputs(
+        definition,
+        await recorder.loadNodeOutputs(args.flowRunId),
+      )
+      for (const nodeId of ready) await this.runNode(nodeId, args, nodeOutputs)
     }
 
     const states = await recorder.loadNodeStates(args.flowRunId)
     if (states.some((s) => s.status === RunStatus.WaitingCallback)) {
       return { waiting: true, status: RunStatus.Running }
     }
-    const anyFailed = states.some((s) => s.status === RunStatus.Failed)
+    // Run-level outcome: failed if any node's aggregate status is Failed.
+    const anyFailed = [...groupByNode(states)].some(
+      ([nodeId, insts]) => aggregateStatus(getNode(definition, nodeId), insts) === RunStatus.Failed,
+    )
     return { waiting: false, status: anyFailed ? RunStatus.Failed : RunStatus.Success }
   }
 
   /**
    * Nodes with no NodeRun yet whose incoming edge has fired. An entry node (no
-   * incoming edges) fires immediately. A downstream node fires when some
-   * predecessor is terminal with an outcome matching the edge condition. A
-   * predecessor that is still WAITING_CALLBACK gates its successors.
+   * incoming edges) fires immediately. A downstream node fires when a
+   * predecessor's *aggregate* status (across all fan-out instances, per its join
+   * policy) matches the edge condition. A predecessor still WAITING/running gates
+   * its successors.
    */
   private computeReady(definition: FlowDefinition, states: NodeState[]): string[] {
-    const started = new Set(states.map((s) => s.nodeId))
-    const statusByNode = new Map(states.map((s) => [s.nodeId, s.status]))
+    const byNode = groupByNode(states)
     const ready: string[] = []
 
     for (const node of definition.nodes) {
-      if (started.has(node.id)) continue
+      if (byNode.has(node.id)) continue // already started
       const incoming = incomingEdges(definition, node.id)
       if (incoming.length === 0) {
         ready.push(node.id) // entry node
         continue
       }
       const fired = incoming.some((edge) => {
-        const src = statusByNode.get(edge.source)
-        if (src === RunStatus.Success) return edge.on === "success" || edge.on === "always"
-        if (src === RunStatus.Failed) return edge.on === "failure" || edge.on === "always"
+        const agg = aggregateStatus(getNode(definition, edge.source), byNode.get(edge.source) ?? [])
+        if (agg === RunStatus.Success) return edge.on === "success" || edge.on === "always"
+        if (agg === RunStatus.Failed) return edge.on === "failure" || edge.on === "always"
         return false
       })
       if (fired) ready.push(node.id)
@@ -153,18 +242,69 @@ export class ExecutionEngine {
     return ready
   }
 
-  private async runNode(nodeId: string, args: AdvanceArgs): Promise<void> {
-    const { recorder } = args
+  /** Run a node: a single instance, or fan it out into one instance per item. */
+  private async runNode(
+    nodeId: string,
+    args: AdvanceArgs,
+    nodeOutputs: Record<string, unknown>,
+  ): Promise<void> {
     const node = getNode(args.definition, nodeId)
     if (!node) return
 
+    if (!node.forEach) {
+      await this.runInstance(node, 0, undefined, args, nodeOutputs)
+      return
+    }
+
+    // Fan-out: evaluate the array, then run one instance per item.
+    let items: unknown
+    try {
+      items = await evaluateExpression(node.forEach, {
+        runDate: args.runDate,
+        params: args.params,
+        nodes: nodeOutputs,
+      })
+    } catch (err) {
+      await this.recordSentinel(
+        node,
+        args,
+        RunStatus.Failed,
+        `forEach failed: ${(err as Error).message}`,
+      )
+      return
+    }
+    const arr = Array.isArray(items) ? items : items == null ? [] : [items]
+    if (arr.length === 0) {
+      // Vacuous success — mark the node done so successors can fire.
+      await this.recordSentinel(node, args, RunStatus.Success, undefined, [])
+      return
+    }
+
+    const limit = Math.max(1, node.forEachConcurrency ?? DEFAULT_FOREACH_CONCURRENCY)
+    for (let i = 0; i < arr.length; i += limit) {
+      await Promise.all(
+        arr
+          .slice(i, i + limit)
+          .map((item, j) => this.runInstance(node, i + j, item, args, nodeOutputs)),
+      )
+    }
+  }
+
+  /** Claim + execute one node instance (mapIndex within a fan-out, or 0). */
+  private async runInstance(
+    node: FlowNode,
+    mapIndex: number,
+    item: unknown,
+    args: AdvanceArgs,
+    nodeOutputs: Record<string, unknown>,
+  ): Promise<void> {
+    const { recorder } = args
     const completionMode: CompletionMode = node.completion ?? "sync"
-    let token: string | undefined
     let callback: RunContext["callback"]
     let callbackTokenHash: string | undefined
     let callbackDeadline: Date | undefined
     if (completionMode === "callback") {
-      token = this.genToken()
+      const token = this.genToken()
       callbackTokenHash = sha256(token)
       const timeout = node.callbackTimeoutMs ?? node.timeoutMs ?? DEFAULT_CALLBACK_TIMEOUT_MS
       callbackDeadline = new Date(this.now() + timeout)
@@ -173,21 +313,24 @@ export class ExecutionEngine {
 
     const claimed = await recorder.claimNodeRun({
       flowRunId: args.flowRunId,
-      nodeId,
-      mapIndex: 0,
+      nodeId: node.id,
+      mapIndex,
       executor: node.executor.type,
       completionMode,
       callbackTokenHash,
       callbackDeadline,
     })
-    if (!claimed) return // another advance already claimed this node
+    if (!claimed) return // another advance already claimed this instance
 
     const ctx: RunContext = {
       flowRunId: args.flowRunId,
-      nodeId,
+      nodeId: node.id,
       runDate: args.runDate,
       params: args.params,
-      onLog: (line) => recorder.nodeLog?.(args.flowRunId, nodeId, line),
+      item,
+      mapIndex,
+      nodeOutputs,
+      onLog: (line) => recorder.nodeLog?.(args.flowRunId, node.id, line),
       callback,
     }
     const { result, attempt } = await this.executeWithRetry(node, ctx)
@@ -211,6 +354,25 @@ export class ExecutionEngine {
       output: result.output,
       errorMessage: result.errorMessage,
     })
+  }
+
+  /** Mark a fan-out node done without running items (empty array / eval error). */
+  private async recordSentinel(
+    node: FlowNode,
+    args: AdvanceArgs,
+    status: RunStatus,
+    errorMessage?: string,
+    output?: unknown,
+  ): Promise<void> {
+    const claimed = await args.recorder.claimNodeRun({
+      flowRunId: args.flowRunId,
+      nodeId: node.id,
+      mapIndex: 0,
+      executor: node.executor.type,
+      completionMode: "sync",
+    })
+    if (!claimed) return
+    await args.recorder.updateNodeRun(claimed.id, { status, attempt: 0, output, errorMessage })
   }
 
   private async executeWithRetry(

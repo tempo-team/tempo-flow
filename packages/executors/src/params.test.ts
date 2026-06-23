@@ -47,12 +47,15 @@ describe("resolveNodeParams", () => {
   }
 
   it("merges static + formatted date params", async () => {
-    const params = await resolveNodeParams(node, BASE)
+    const params = await resolveNodeParams(node, { runDate: BASE })
     expect(params).toEqual({ source: "orders", startAt: "20260613", yyyymm: "202606" })
   })
 
   it("applies manual overrides last (backfill)", async () => {
-    const params = await resolveNodeParams(node, BASE, { startAt: "20260101" })
+    const params = await resolveNodeParams(node, {
+      runDate: BASE,
+      overrides: { startAt: "20260101" },
+    })
     expect(params.startAt).toBe("20260101")
   })
 
@@ -63,7 +66,32 @@ describe("resolveNodeParams", () => {
       executor: { type: "http", url: "https://x.test/r", method: "POST" },
       params: { static: { region: "kr", target: '={{ params.region & "-prod" }}' } },
     }
-    const params = await resolveNodeParams(exprNode, BASE)
+    const params = await resolveNodeParams(exprNode, { runDate: BASE })
     expect(params.target).toBe("kr-prod")
+  })
+
+  it("exposes the fan-out item to expressions (={{ item.id }})", async () => {
+    const itemNode: FlowNode = {
+      id: "n3",
+      name: "x",
+      executor: { type: "http", url: "https://x.test/r", method: "POST" },
+      params: { static: { id: "={{ item.id }}", tag: '={{ "n" & item.id }}' } },
+    }
+    const params = await resolveNodeParams(itemNode, { runDate: BASE, item: { id: 7 } })
+    expect(params).toEqual({ id: "7", tag: "n7" })
+  })
+
+  it("references an upstream node output via nodes.<id>.output", async () => {
+    const refNode: FlowNode = {
+      id: "n4",
+      name: "x",
+      executor: { type: "http", url: "https://x.test/r", method: "POST" },
+      params: { static: { region: "={{ nodes.fetch.output.region }}" } },
+    }
+    const params = await resolveNodeParams(refNode, {
+      runDate: BASE,
+      nodes: { fetch: { output: { region: "kr" } } },
+    })
+    expect(params.region).toBe("kr")
   })
 })

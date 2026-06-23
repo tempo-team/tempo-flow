@@ -46,7 +46,12 @@ export class ScriptExecutor implements JobExecutor {
 
   async execute(node: FlowNode, ctx: RunContext): Promise<ExecResult> {
     const cfg = node.executor as ScriptExecutorConfig
-    const params = await resolveNodeParams(node, ctx.runDate, ctx.params)
+    const params = await resolveNodeParams(node, {
+      runDate: ctx.runDate,
+      overrides: ctx.params,
+      item: ctx.item,
+      nodes: ctx.nodeOutputs,
+    })
 
     const env: Record<string, string> = {
       TEMPO_PARAMS: JSON.stringify(params),
@@ -54,6 +59,10 @@ export class ScriptExecutor implements JobExecutor {
       TEMPO_NODE_ID: ctx.nodeId,
     }
     for (const [key, value] of Object.entries(params)) env[envKey(key)] = value
+    if (ctx.item !== undefined) {
+      env.TEMPO_ITEM = typeof ctx.item === "string" ? ctx.item : JSON.stringify(ctx.item)
+      env.TEMPO_MAP_INDEX = String(ctx.mapIndex ?? 0)
+    }
     if (ctx.callback) {
       env.TEMPO_CALLBACK_URL = ctx.callback.url
       env.TEMPO_CALLBACK_TOKEN = ctx.callback.token

@@ -26,6 +26,12 @@ export interface RunContext {
    * hand these to the triggered job (env/headers/body) so it can report back.
    */
   callback?: CallbackContext
+  /** Current fan-out item (set for fan-out node instances; `item` in exprs). */
+  item?: unknown
+  /** This instance's fan-out index (0 for non-fan-out nodes). */
+  mapIndex?: number
+  /** Upstream node outputs by node id, for `nodes.<id>.output` expressions. */
+  nodeOutputs?: Record<string, unknown>
 }
 
 /** Result of executing one node. */
