@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest"
 import type { RunContext } from "./executor.js"
 import { HttpExecutor } from "./http-executor.js"
 
-const ctx: RunContext = { flowRunId: "run-1", runDate: new Date(2026, 5, 20) }
+const ctx: RunContext = { flowRunId: "run-1", nodeId: "n1", runDate: new Date(2026, 5, 20) }
 
 function node(extra: Partial<FlowNode> = {}): FlowNode {
   return {

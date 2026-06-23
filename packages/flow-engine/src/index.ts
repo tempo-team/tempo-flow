@@ -22,6 +22,6 @@ export {
   validateFlowDefinition,
   validateFlowTrigger,
 } from "./validate.js"
-export { type NodeOutcome, getNode, outgoingTargets } from "./run.js"
+export { type NodeOutcome, getNode, incomingEdges, outgoingTargets } from "./run.js"
 
 export const FLOW_ENGINE_VERSION = "0.0.0"

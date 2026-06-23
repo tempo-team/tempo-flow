@@ -16,7 +16,13 @@ function build(opts: {
 }) {
   const findMany = vi.fn().mockResolvedValue(opts.runs)
   const updateMany = vi.fn().mockResolvedValue({ count: opts.updateCount ?? 1 })
-  const prisma = { flowRun: { findMany, updateMany } } as unknown as PrismaService
+  // No suspended callback nodes by default (Phase 0 watchdog additions).
+  const nodeFindMany = vi.fn().mockResolvedValue([])
+  const nodeCount = vi.fn().mockResolvedValue(0)
+  const prisma = {
+    flowRun: { findMany, updateMany },
+    nodeRun: { findMany: nodeFindMany, updateMany: vi.fn(), count: nodeCount },
+  } as unknown as PrismaService
   const getJob = vi
     .fn()
     .mockResolvedValue(
@@ -24,7 +30,8 @@ function build(opts: {
         ? null
         : { getState: vi.fn().mockResolvedValue(opts.jobState ?? "failed") },
     )
-  const queue = { getQueue: () => ({ getJob }) } as unknown as QueueService
+  const enqueueResume = vi.fn().mockResolvedValue(undefined)
+  const queue = { getQueue: () => ({ getJob }), enqueueResume } as unknown as QueueService
   const publish = vi.fn().mockResolvedValue(undefined)
   const runEvents = { publish } as unknown as RunEventsService
   const emit = vi.fn()

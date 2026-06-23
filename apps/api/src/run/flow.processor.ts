@@ -34,7 +34,7 @@ export class FlowProcessor implements OnModuleInit, OnModuleDestroy {
     this.worker = new Worker<FlowRunJobData>(
       FLOW_RUN_QUEUE,
       async (job) => {
-        await this.runService.executeRun(job.data.flowRunId)
+        await this.runService.executeRun(job.data.flowRunId, job.data.resume ?? false)
       },
       // Dedicated (duplicated) connection — workers issue blocking commands.
       { connection: this.connection.duplicate() as unknown as ConnectionOptions, concurrency },

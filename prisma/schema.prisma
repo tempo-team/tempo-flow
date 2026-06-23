@@ -169,16 +169,25 @@ model NodeRun {
   flowRunId    String
   flowRun      FlowRun   @relation(fields: [flowRunId], references: [id], onDelete: Cascade)
   nodeId       String    // node id within the DAG
-  status       String    // PENDING | RUNNING | SUCCESS | FAILED | CANCELED
+  mapIndex     Int       @default(0) // fan-out instance index (Phase 2); 0 for normal nodes
+  status       String    // PENDING | RUNNING | WAITING_CALLBACK | SUCCESS | FAILED | CANCELED
   attempt      Int       @default(0)
-  executor     String    // "http" | "k8s"
+  executor     String    // "http" | "k8s" | "subflow" | "script"
+  completionMode String  @default("sync") // sync | callback
+  callbackTokenHash String? @unique // sha256 of the one-time callback token
+  callbackDeadline  DateTime?        // WAITING_CALLBACK fails past this instant
   request      String?   // JSON: actual request (query/body/env)
   response     String?   // JSON: response / exit code / log summary
+  output       String?   // JSON: callback-reported output, for downstream params
   errorMessage String?
   startedAt    DateTime?
   finishedAt   DateTime?
 
+  // Claim = right-to-execute: the unique key makes node execution idempotent
+  // across concurrent advances (Phase 0 checkpoint-resume engine).
+  @@unique([flowRunId, nodeId, mapIndex])
   @@index([flowRunId])
+  @@index([status, callbackDeadline])
 }
 
 model SystemSetting {

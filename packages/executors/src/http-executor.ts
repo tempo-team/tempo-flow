@@ -27,6 +27,17 @@ export class HttpExecutor implements JobExecutor {
     let body: string | undefined
     const headers: Record<string, string> = { ...(cfg.headers ?? {}) }
 
+    // Callback mode: tell the external job where to report its real completion.
+    // Sent both as headers and merged params so simple receivers can read either.
+    if (ctx.callback) {
+      headers["x-tempo-callback-url"] = ctx.callback.url
+      headers["x-tempo-callback-token"] = ctx.callback.token
+      headers["x-tempo-run-id"] = ctx.flowRunId
+      headers["x-tempo-node-id"] = ctx.nodeId
+      params._tempoCallbackUrl = ctx.callback.url
+      params._tempoCallbackToken = ctx.callback.token
+    }
+
     if (paramsIn === "query") {
       for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
     } else {

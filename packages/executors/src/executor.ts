@@ -3,15 +3,29 @@
 
 import type { ExecutorType, FlowNode } from "@tempo-flow/shared-types"
 
+/** Callback coordinates for a node running in async-completion mode. */
+export interface CallbackContext {
+  /** Full URL the external job POSTs its result to. */
+  url: string
+  /** Opaque one-time token (also embedded in the URL). */
+  token: string
+}
+
 /** Runtime context handed to an executor for a single node run. */
 export interface RunContext {
   flowRunId: string
+  nodeId: string
   /** The effective run date — substituted into date params. */
   runDate: Date
   /** Extra params merged on top of the node's resolved params (manual runs). */
   params?: Record<string, string>
   /** Emit a live log line for this node (streamed to the UI). Best-effort. */
   onLog?: (line: string) => void
+  /**
+   * Present when the node runs in `callback` completion mode. The executor must
+   * hand these to the triggered job (env/headers/body) so it can report back.
+   */
+  callback?: CallbackContext
 }
 
 /** Result of executing one node. */

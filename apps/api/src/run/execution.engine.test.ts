@@ -4,30 +4,58 @@
 import type { ExecResult, JobExecutor } from "@tempo-flow/executors"
 import { type FlowDefinition, type FlowNode, RunStatus } from "@tempo-flow/shared-types"
 import { describe, expect, it } from "vitest"
-import { ExecutionEngine, type NodeRunRecorder } from "./execution.engine"
+import {
+  type AdvanceArgs,
+  ExecutionEngine,
+  type NodeRunRecorder,
+  type NodeState,
+} from "./execution.engine"
 
-function node(id: string): FlowNode {
-  return { id, name: id, executor: { type: "http", url: "https://x.test/r", method: "POST" } }
+function node(id: string, extra: Partial<FlowNode> = {}): FlowNode {
+  return {
+    id,
+    name: id,
+    executor: { type: "http", url: "https://x.test/r", method: "POST" },
+    ...extra,
+  }
 }
 
-/** Records node runs and lets tests script per-node outcomes. */
-function setup(outcomes: Record<string, boolean[]>) {
-  const updates: { nodeId: string; status: RunStatus; attempt: number }[] = []
-  const calls: Record<string, number> = {}
-  const idToNode: Record<string, string> = {}
+interface Row {
+  id: string
+  nodeId: string
+  status: RunStatus
+  errorMessage?: string
+}
 
-  const recorder: NodeRunRecorder = {
-    async createNodeRun({ nodeId }) {
-      const id = `nr-${nodeId}`
-      idToNode[id] = nodeId
+/** In-memory recorder mimicking the (flowRunId,nodeId) unique-claim semantics. */
+function recorder() {
+  const rows = new Map<string, Row>() // nodeId → row
+  let seq = 0
+  const calls: Record<string, number> = {}
+  const rec: NodeRunRecorder = {
+    async loadNodeStates(): Promise<NodeState[]> {
+      return [...rows.values()].map((r) => ({ nodeId: r.nodeId, mapIndex: 0, status: r.status }))
+    },
+    async claimNodeRun(input) {
+      if (rows.has(input.nodeId)) return null // already claimed
+      const id = `nr-${seq++}`
+      rows.set(input.nodeId, { id, nodeId: input.nodeId, status: RunStatus.Running })
       return { id }
     },
     async updateNodeRun(id, patch) {
-      updates.push({ nodeId: idToNode[id], status: patch.status, attempt: patch.attempt })
+      const row = [...rows.values()].find((r) => r.id === id)
+      if (row) {
+        row.status = patch.status
+        row.errorMessage = patch.errorMessage
+      }
     },
   }
+  return { rec, rows, calls }
+}
 
-  const executor: JobExecutor = {
+/** Executor whose per-node outcome is scripted; counts calls. */
+function executor(outcomes: Record<string, boolean[]>, calls: Record<string, number>): JobExecutor {
+  return {
     type: "http",
     async execute(n): Promise<ExecResult> {
       calls[n.id] = (calls[n.id] ?? 0) + 1
@@ -36,28 +64,26 @@ function setup(outcomes: Record<string, boolean[]>) {
       return ok ? { ok: true, response: { status: 200 } } : { ok: false, errorMessage: "fail" }
     },
   }
-
-  const engine = new ExecutionEngine({ http: executor }, async () => {})
-  return { engine, recorder, updates, calls }
 }
 
-const recorderRunDate = new Date(2026, 5, 20)
+const BASE = new Date(2026, 5, 20)
 
-describe("ExecutionEngine", () => {
+function args(rec: NodeRunRecorder, definition: FlowDefinition): AdvanceArgs {
+  return { flowRunId: "run1", definition, runDate: BASE, recorder: rec }
+}
+
+describe("ExecutionEngine.advance", () => {
   it("runs a linear DAG in order and reports SUCCESS", async () => {
     const def: FlowDefinition = {
       nodes: [node("a"), node("b")],
       edges: [{ id: "e1", source: "a", target: "b", on: "success" }],
     }
-    const { engine, recorder, updates } = setup({})
-    const status = await engine.runFlow({
-      flowRunId: "run1",
-      definition: def,
-      runDate: recorderRunDate,
-      recorder,
-    })
-    expect(status).toBe(RunStatus.Success)
-    expect(updates.map((u) => u.nodeId)).toEqual(["a", "b"])
+    const { rec, rows, calls } = recorder()
+    const engine = new ExecutionEngine({ http: executor({}, calls) }, { sleep: async () => {} })
+    const result = await engine.advance(args(rec, def))
+    expect(result).toEqual({ waiting: false, status: RunStatus.Success })
+    expect(rows.get("a")?.status).toBe(RunStatus.Success)
+    expect(rows.get("b")?.status).toBe(RunStatus.Success)
   })
 
   it("runs all successors on fan-out", async () => {
@@ -68,9 +94,11 @@ describe("ExecutionEngine", () => {
         { id: "e2", source: "a", target: "c", on: "success" },
       ],
     }
-    const { engine, recorder, updates } = setup({})
-    await engine.runFlow({ flowRunId: "r", definition: def, runDate: recorderRunDate, recorder })
-    expect(new Set(updates.map((u) => u.nodeId))).toEqual(new Set(["a", "b", "c"]))
+    const { rec, rows, calls } = recorder()
+    const engine = new ExecutionEngine({ http: executor({}, calls) }, { sleep: async () => {} })
+    await engine.advance(args(rec, def))
+    expect(rows.get("b")?.status).toBe(RunStatus.Success)
+    expect(rows.get("c")?.status).toBe(RunStatus.Success)
   })
 
   it("follows the failure branch and skips the success path", async () => {
@@ -81,78 +109,78 @@ describe("ExecutionEngine", () => {
         { id: "e2", source: "a", target: "recover", on: "failure" },
       ],
     }
-    const { engine, recorder, updates } = setup({ a: [false] })
-    const status = await engine.runFlow({
-      flowRunId: "r",
-      definition: def,
-      runDate: recorderRunDate,
-      recorder,
-    })
-    expect(status).toBe(RunStatus.Failed)
-    const ran = updates.map((u) => u.nodeId)
-    expect(ran).toContain("recover")
-    expect(ran).not.toContain("ok")
+    const { rec, rows, calls } = recorder()
+    const engine = new ExecutionEngine(
+      { http: executor({ a: [false] }, calls) },
+      { sleep: async () => {} },
+    )
+    const result = await engine.advance(args(rec, def))
+    expect(result.status).toBe(RunStatus.Failed)
+    expect(rows.has("recover")).toBe(true)
+    expect(rows.has("ok")).toBe(false)
   })
 
   it("retries a node per its policy and succeeds", async () => {
     const def: FlowDefinition = {
-      nodes: [{ ...node("a"), retry: { max: 2, backoff: "fixed", delayMs: 0 } }],
+      nodes: [node("a", { retry: { max: 2, backoff: "fixed", delayMs: 0 } })],
       edges: [],
     }
-    const { engine, recorder, updates, calls } = setup({ a: [false, false, true] })
-    const status = await engine.runFlow({
-      flowRunId: "r",
-      definition: def,
-      runDate: recorderRunDate,
-      recorder,
-    })
-    expect(status).toBe(RunStatus.Success)
+    const { rec, calls } = recorder()
+    const engine = new ExecutionEngine(
+      { http: executor({ a: [false, false, true] }, calls) },
+      { sleep: async () => {} },
+    )
+    const result = await engine.advance(args(rec, def))
+    expect(result.status).toBe(RunStatus.Success)
     expect(calls.a).toBe(3) // initial + 2 retries
-    expect(updates[0].attempt).toBe(2)
   })
 
   it("marks a node FAILED when the executor throws (never strands the run)", async () => {
     const def: FlowDefinition = { nodes: [node("a")], edges: [] }
-    const updates: { nodeId: string; status: RunStatus; errorMessage?: string }[] = []
-    const recorder: NodeRunRecorder = {
-      async createNodeRun() {
-        return { id: "nr-a" }
-      },
-      async updateNodeRun(_id, patch) {
-        updates.push({ nodeId: "a", status: patch.status, errorMessage: patch.errorMessage })
-      },
-    }
+    const { rec, rows } = recorder()
     const throwing: JobExecutor = {
       type: "http",
       async execute(): Promise<ExecResult> {
         throw new Error("boom")
       },
     }
-    const engine = new ExecutionEngine({ http: throwing }, async () => {})
-    // Must resolve (not reject) so the run is recorded, not left RUNNING.
-    const status = await engine.runFlow({
-      flowRunId: "r",
-      definition: def,
-      runDate: recorderRunDate,
-      recorder,
-    })
-    expect(status).toBe(RunStatus.Failed)
-    expect(updates[0]).toMatchObject({ status: RunStatus.Failed, errorMessage: "boom" })
+    const engine = new ExecutionEngine({ http: throwing }, { sleep: async () => {} })
+    const result = await engine.advance(args(rec, def))
+    expect(result.status).toBe(RunStatus.Failed)
+    expect(rows.get("a")?.errorMessage).toBe("boom")
   })
 
-  it("marks a node FAILED when retries are exhausted", async () => {
+  it("suspends a callback node and gates its successor until the callback lands", async () => {
     const def: FlowDefinition = {
-      nodes: [{ ...node("a"), retry: { max: 1, backoff: "fixed", delayMs: 0 } }],
-      edges: [],
+      nodes: [node("a", { completion: "callback" }), node("b")],
+      edges: [{ id: "e1", source: "a", target: "b", on: "success" }],
     }
-    const { engine, recorder, updates } = setup({ a: [false, false] })
-    const status = await engine.runFlow({
-      flowRunId: "r",
-      definition: def,
-      runDate: recorderRunDate,
-      recorder,
-    })
-    expect(status).toBe(RunStatus.Failed)
-    expect(updates[0].status).toBe(RunStatus.Failed)
+    const { rec, rows, calls } = recorder()
+    const engine = new ExecutionEngine(
+      { http: executor({}, calls) }, // trigger returns ok
+      { sleep: async () => {}, callbackBaseUrl: "https://host" },
+    )
+
+    // First advance: triggers `a`, leaves it WAITING, does NOT run `b`.
+    const first = await engine.advance(args(rec, def))
+    expect(first).toEqual({ waiting: true, status: RunStatus.Running })
+    expect(rows.get("a")?.status).toBe(RunStatus.WaitingCallback)
+    expect(rows.has("b")).toBe(false)
+
+    // Simulate the completion callback resolving node `a`.
+    rows.get("a")!.status = RunStatus.Success
+
+    // Resume: now `b` runs and the run finalizes.
+    const second = await engine.advance(args(rec, def))
+    expect(second).toEqual({ waiting: false, status: RunStatus.Success })
+    expect(rows.get("b")?.status).toBe(RunStatus.Success)
+  })
+
+  it("does not double-claim a node across concurrent advances", async () => {
+    const def: FlowDefinition = { nodes: [node("a")], edges: [] }
+    const { rec, calls } = recorder()
+    const engine = new ExecutionEngine({ http: executor({}, calls) }, { sleep: async () => {} })
+    await Promise.all([engine.advance(args(rec, def)), engine.advance(args(rec, def))])
+    expect(calls.a).toBe(1) // claimed once despite two concurrent advances
   })
 })

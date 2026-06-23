@@ -6,6 +6,7 @@ import { ConfigModule } from "@nestjs/config"
 import { EventEmitterModule } from "@nestjs/event-emitter"
 import { AuthModule } from "./auth/auth.module"
 import { AuthzModule } from "./authz/authz.module"
+import { CallbackModule } from "./callback/callback.module"
 import { RunEventsModule } from "./events/run-events.module"
 import { FlowModule } from "./flow/flow.module"
 import { HealthController } from "./health.controller"
@@ -36,6 +37,7 @@ import { TriggerModule } from "./trigger/trigger.module"
     SettingModule,
     NotificationModule,
     TriggerModule,
+    CallbackModule,
   ],
   controllers: [HealthController],
 })

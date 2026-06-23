@@ -12,7 +12,7 @@ import {
   k8sName,
 } from "./k8s-executor.js"
 
-const ctx: RunContext = { flowRunId: "RUN_ABC", runDate: new Date(2026, 5, 20) }
+const ctx: RunContext = { flowRunId: "RUN_ABC", nodeId: "n1", runDate: new Date(2026, 5, 20) }
 
 function k8sNode(extra: Partial<FlowNode["executor"]> = {}): FlowNode {
   return {

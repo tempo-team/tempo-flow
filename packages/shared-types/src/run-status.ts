@@ -9,6 +9,8 @@ export const RunStatus = {
   PendingApproval: "PENDING_APPROVAL",
   Pending: "PENDING",
   Running: "RUNNING",
+  /** A node has triggered external work and is awaiting a completion callback. */
+  WaitingCallback: "WAITING_CALLBACK",
   Success: "SUCCESS",
   Failed: "FAILED",
   Canceled: "CANCELED",

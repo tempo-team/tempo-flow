@@ -17,6 +17,7 @@ const node = (flowId: string): FlowNode => ({
 
 const ctx = (flowRunId: string): RunContext => ({
   flowRunId,
+  nodeId: "n1",
   runDate: new Date("2026-06-22T00:00:00Z"),
 })
 

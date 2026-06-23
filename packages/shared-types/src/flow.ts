@@ -59,6 +59,15 @@ export interface RetryPolicy {
   delayMs: number
 }
 
+/**
+ * How a node's success/failure is determined.
+ * - `sync` (default): the executor's immediate result decides it (HTTP 2xx, exit 0).
+ * - `callback`: the executor only *triggers* the work; the node stays in
+ *   WAITING_CALLBACK until the external app reports completion to the callback
+ *   API. Downstream nodes do not run until that signal arrives.
+ */
+export type CompletionMode = "sync" | "callback"
+
 export interface FlowNode {
   id: string
   name: string
@@ -66,6 +75,10 @@ export interface FlowNode {
   params?: NodeParams
   retry?: RetryPolicy
   timeoutMs?: number
+  /** Completion model for this node (default "sync"). */
+  completion?: CompletionMode
+  /** callback mode: ms to wait for the callback before failing the node. */
+  callbackTimeoutMs?: number
 }
 
 export type EdgeCondition = "success" | "failure" | "always"
