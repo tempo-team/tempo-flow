@@ -39,10 +39,13 @@ export class CallbackService {
     if (node.status !== RunStatus.WaitingCallback) return { ok: true }
 
     const status = body.status === "success" ? RunStatus.Success : RunStatus.Failed
-    // Scrub any secret value the job echoed back in its output before persisting.
-    const secrets = await this.secrets.resolveForFlow(node.flowRun.flowId)
-    const output =
-      body.output === undefined ? null : toJson(maskValues(body.output, Object.values(secrets)))
+    // Scrub any secret value the job echoed back in its output before persisting
+    // (only loads/decrypts secrets when there's actually output to mask).
+    let output: string | null = null
+    if (body.output !== undefined) {
+      const secrets = await this.secrets.resolveForFlow(node.flowRun.flowId)
+      output = toJson(maskValues(body.output, Object.values(secrets)))
+    }
     // Conditional update = the race guard: only one callback/timeout wins.
     const res = await this.prisma.nodeRun.updateMany({
       where: { id: node.id, status: RunStatus.WaitingCallback },

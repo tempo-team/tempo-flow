@@ -49,12 +49,12 @@ describe("OidcService.mapRolesFromGroups", () => {
 describe("OidcService.provisionUser", () => {
   it("creates a new user (random pw) and assigns the mapped roles", async () => {
     const findUnique = vi.fn().mockResolvedValue(null) // new user
-    const userCreate = vi.fn().mockResolvedValue({ id: "u1" })
+    const upsert = vi.fn().mockResolvedValue({ id: "u1" })
     const roleFindMany = vi.fn().mockResolvedValue([{ id: "r-admin" }])
     const deleteMany = vi.fn().mockResolvedValue({ count: 0 })
     const create = vi.fn().mockResolvedValue({})
     const prisma = {
-      user: { findUnique, create: userCreate },
+      user: { findUnique, upsert },
       role: { findMany: roleFindMany },
       userRole: { deleteMany, create },
     } as unknown as PrismaService
@@ -62,18 +62,18 @@ describe("OidcService.provisionUser", () => {
 
     const id = await svc.provisionUser("a@b.com", "Alice", ["admin"])
     expect(id).toBe("u1")
-    expect(userCreate.mock.calls[0][0].data.passwordHash).toMatch(/^oidc:/)
+    expect(upsert.mock.calls[0][0].create.passwordHash).toMatch(/^oidc:/)
     expect(deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } })
     expect(create).toHaveBeenCalledWith({ data: { userId: "u1", roleId: "r-admin" } })
   })
 
   it("does NOT clobber the roles of a pre-existing local (password) user", async () => {
     const findUnique = vi.fn().mockResolvedValue({ id: "u9", passwordHash: "$2b$bcrypthash" })
-    const userUpdate = vi.fn().mockResolvedValue({ id: "u9" })
+    const upsert = vi.fn().mockResolvedValue({ id: "u9" })
     const deleteMany = vi.fn()
     const create = vi.fn()
     const prisma = {
-      user: { findUnique, update: userUpdate },
+      user: { findUnique, upsert },
       role: { findMany: vi.fn() },
       userRole: { deleteMany, create },
     } as unknown as PrismaService

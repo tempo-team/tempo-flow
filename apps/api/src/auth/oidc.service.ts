@@ -150,22 +150,21 @@ export class OidcService {
     name: string | undefined,
     roleNames: string[],
   ): Promise<string> {
+    // Decide local-vs-SSO before writing; the write itself stays atomic (upsert)
+    // so two concurrent first-logins can't collide on the unique email.
     const existing = await this.prisma.user.findUnique({ where: { email } })
-    const oidcManaged = !existing || existing.passwordHash.startsWith("oidc:")
+    const oidcManaged = !existing || (existing.passwordHash ?? "").startsWith("oidc:")
 
-    const user = existing
-      ? await this.prisma.user.update({
-          where: { id: existing.id },
-          data: name ? { name } : {},
-        })
-      : await this.prisma.user.create({
-          data: {
-            email,
-            name: name ?? null,
-            passwordHash: `oidc:${randomBytes(24).toString("hex")}`,
-            active: true,
-          },
-        })
+    const user = await this.prisma.user.upsert({
+      where: { email },
+      create: {
+        email,
+        name: name ?? null,
+        passwordHash: `oidc:${randomBytes(24).toString("hex")}`,
+        active: true,
+      },
+      update: name ? { name } : {},
+    })
 
     if (oidcManaged) {
       const roles = await this.prisma.role.findMany({ where: { name: { in: roleNames } } })

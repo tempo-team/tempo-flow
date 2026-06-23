@@ -5,17 +5,29 @@
  * Replace every sensitive value occurring in a recorded artifact with `***`, so
  * secrets and one-time callback tokens are never persisted in plaintext (e.g. an
  * HTTP header/body/query that interpolated a `secrets.*` expression, or the
- * callback token handed to a job). Operates on the serialized form so nested
- * values are caught too.
+ * callback token handed to a job).
+ *
+ * Recurses the structure and substitutes only inside *string* values — never
+ * touching JSON literals (a secret whose value is `"true"` or a number must not
+ * mangle a real `true`/number elsewhere in the payload).
  */
-export function maskValues(value: unknown, sensitive: Array<string | undefined>): unknown {
-  if (value === undefined) return value
+export function maskValues<T>(value: T, sensitive: Array<string | undefined>): T {
   const values = sensitive.filter((v): v is string => typeof v === "string" && v.length > 0)
   if (values.length === 0) return value
-  let json = JSON.stringify(value)
-  for (const v of values) {
-    // Match the value as it appears inside JSON (escaped, without the quotes).
-    json = json.split(JSON.stringify(v).slice(1, -1)).join("***")
+  return walk(value, values) as T
+}
+
+function walk(value: unknown, values: string[]): unknown {
+  if (typeof value === "string") {
+    let s = value
+    for (const v of values) if (s.includes(v)) s = s.split(v).join("***")
+    return s
   }
-  return JSON.parse(json)
+  if (Array.isArray(value)) return value.map((v) => walk(v, values))
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value)) out[k] = walk(v, values)
+    return out
+  }
+  return value
 }
