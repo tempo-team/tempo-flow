@@ -11,6 +11,7 @@ interface NodeRunRow {
   executor: string
   request: string | null
   response: string | null
+  output: string | null
   errorMessage: string | null
   startedAt: Date | null
   finishedAt: Date | null
@@ -36,6 +37,8 @@ export class NodeRunResponse {
   executor!: string
   request!: unknown
   response!: unknown
+  /** Result reported by an async-completion callback (downstream-consumable). */
+  output!: unknown
   errorMessage!: string | null
   startedAt!: string | null
   finishedAt!: string | null
@@ -49,6 +52,7 @@ export class NodeRunResponse {
       executor: row.executor,
       request: fromJsonOpt(row.request) ?? null,
       response: fromJsonOpt(row.response) ?? null,
+      output: fromJsonOpt(row.output) ?? null,
       errorMessage: row.errorMessage,
       startedAt: row.startedAt?.toISOString() ?? null,
       finishedAt: row.finishedAt?.toISOString() ?? null,

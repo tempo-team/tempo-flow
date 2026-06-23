@@ -55,6 +55,8 @@ export const flowNodeSchema = z.object({
   params: nodeParamsSchema.optional(),
   retry: retrySchema.optional(),
   timeoutMs: z.number().int().positive().optional(),
+  completion: z.enum(["sync", "callback"]).optional(),
+  callbackTimeoutMs: z.number().int().positive().optional(),
 })
 
 export const flowEdgeSchema = z.object({
