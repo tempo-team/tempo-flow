@@ -1,7 +1,7 @@
 // Copyright 2026 The tempo-flow Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { createHash, randomBytes } from "node:crypto"
+import { randomBytes } from "node:crypto"
 import { SpanStatusCode, context as otelContext, propagation, trace } from "@opentelemetry/api"
 import {
   type CompletionMode,
@@ -16,6 +16,7 @@ import {
   type RunContext,
   evaluateExpression,
 } from "@tempo-flow/executors"
+import { sha256Hex } from "../common/crypto"
 import { maskValues } from "../common/mask"
 
 export interface NodeRunRecord {
@@ -330,7 +331,7 @@ export class ExecutionEngine {
     let callbackDeadline: Date | undefined
     if (completionMode === "callback") {
       const token = this.genToken()
-      callbackTokenHash = sha256(token)
+      callbackTokenHash = sha256Hex(token)
       const timeout = node.callbackTimeoutMs ?? node.timeoutMs ?? DEFAULT_CALLBACK_TIMEOUT_MS
       callbackDeadline = new Date(this.now() + timeout)
       callback = { token, url: `${this.callbackBaseUrl}/api/callbacks/${token}` }
@@ -461,10 +462,6 @@ export class ExecutionEngine {
     }
     return { result, attempt }
   }
-}
-
-function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex")
 }
 
 /**

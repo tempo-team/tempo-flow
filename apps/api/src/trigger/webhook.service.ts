@@ -1,16 +1,12 @@
 // Copyright 2026 The tempo-flow Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto"
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto"
 import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
-import { decryptSecret, encryptSecret } from "../common/crypto"
+import { decryptSecret, encryptSecret, sha256Hex } from "../common/crypto"
 import { PrismaService } from "../prisma/prisma.service"
 import { RunLauncherService } from "../run/run-launcher.service"
-
-function sha256hex(value: string): string {
-  return createHash("sha256").update(value).digest("hex")
-}
 
 export interface CreatedWebhook {
   id: string
@@ -49,7 +45,7 @@ export class WebhookService {
     const row = await this.prisma.flowWebhook.create({
       data: {
         flowId,
-        tokenHash: sha256hex(token),
+        tokenHash: sha256Hex(token),
         secretEncrypted: secret ? encryptSecret(secret, this.encKey()) : null,
         label: label ?? null,
       },
@@ -88,7 +84,7 @@ export class WebhookService {
     signature: string | undefined,
   ): Promise<{ runId: string }> {
     const webhook = await this.prisma.flowWebhook.findUnique({
-      where: { tokenHash: sha256hex(token) },
+      where: { tokenHash: sha256Hex(token) },
     })
     if (!webhook || !webhook.enabled) throw new UnauthorizedException("Invalid webhook token")
 

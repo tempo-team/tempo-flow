@@ -1,9 +1,9 @@
 // Copyright 2026 The tempo-flow Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { createHash } from "node:crypto"
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { type FlowDefinition, RunStatus, fromJson, toJson } from "@tempo-flow/shared-types"
+import { sha256Hex } from "../common/crypto"
 import { maskValues } from "../common/mask"
 import { RunEventsService } from "../events/run-events.service"
 import { PrismaService } from "../prisma/prisma.service"
@@ -100,12 +100,8 @@ export class CallbackService {
 
   private findByToken(token: string) {
     return this.prisma.nodeRun.findUnique({
-      where: { callbackTokenHash: sha256(token) },
+      where: { callbackTokenHash: sha256Hex(token) },
       include: { flowRun: { include: { flow: true } } },
     })
   }
-}
-
-function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex")
 }

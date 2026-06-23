@@ -5,6 +5,11 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 
 const ALGO = "aes-256-gcm"
 
+/** Hex-encoded SHA-256 of a value (e.g. for storing token lookups, never the raw token). */
+export function sha256Hex(value: string): string {
+  return createHash("sha256").update(value).digest("hex")
+}
+
 /** Derive a 32-byte key from the configured secret (any length). */
 function deriveKey(secret: string): Buffer {
   return createHash("sha256").update(secret).digest()
