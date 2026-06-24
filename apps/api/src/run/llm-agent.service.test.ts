@@ -200,6 +200,51 @@ describe("LlmAgentService", () => {
     expect(launch).not.toHaveBeenCalled()
   })
 
+  it("encrypts the persisted conversation at rest (no plaintext prompt)", async () => {
+    const { svc, agents, akey } = build(stepClient([toolUseStep()]))
+    await svc.start({ ...startInput(), prompt: "secret prompt body s3cr3t" })
+    const state = agents[akey({ flowRunId: "run-1", nodeId: "agent", mapIndex: 0 })]
+    // messages column must not contain the resolved prompt text in plaintext.
+    expect(state.messages as string).not.toContain("s3cr3t")
+    expect(state.messages as string).not.toContain("secret prompt body")
+  })
+
+  it("continue: reschedules without consuming the turn if the node isn't suspended yet", async () => {
+    const { svc, queue, flowRuns, nodeRuns, agents, akey } = build(
+      stepClient([toolUseStep(), doneStep("answer")]),
+    )
+    flowRuns["run-1"] = {
+      id: "run-1",
+      flowId: "flow-A",
+      status: RunStatus.Running,
+      definition: "{}",
+    }
+    // node is still RUNNING (engine hasn't written WAITING_CALLBACK — launch-before-commit)
+    nodeRuns.push({
+      id: "nr-1",
+      flowRunId: "run-1",
+      nodeId: "agent",
+      mapIndex: 0,
+      status: RunStatus.Running,
+      attempt: 0,
+    })
+    await svc.start(startInput())
+    flowRuns["child-1"] = {
+      id: "child-1",
+      flowId: TOOL_FLOW,
+      status: RunStatus.Success,
+      definition: "{}",
+    }
+
+    await svc.continue("run-1")
+
+    expect(nodeRuns.find((n) => n.id === "nr-1")!.status).toBe(RunStatus.Running) // not finalized
+    expect(agents[akey({ flowRunId: "run-1", nodeId: "agent", mapIndex: 0 })].status).toBe(
+      "WAITING_TOOLS",
+    )
+    expect(queue.enqueueResume).toHaveBeenCalledWith("run-1", "flow-A") // retry scheduled
+  })
+
   it("continue: no-op while the tool sub-flow is still running", async () => {
     const { svc, flowRuns } = build(stepClient([toolUseStep(), doneStep("answer")]))
     await svc.start(startInput())

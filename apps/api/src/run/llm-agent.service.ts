@@ -23,6 +23,7 @@ import {
   isTerminal,
   toJson,
 } from "@tempo-flow/shared-types"
+import { decryptSecret, encryptSecret } from "../common/crypto"
 import { maskValues } from "../common/mask"
 import { RunEventsService } from "../events/run-events.service"
 import { FLOW_RUN_FINISHED, type FlowRunFinishedEvent } from "../notification/notification.listener"
@@ -80,6 +81,8 @@ interface TurnCtx {
 export class LlmAgentService {
   private readonly logger = new Logger(LlmAgentService.name)
   readonly clients: Partial<Record<LlmProvider, LlmClient>>
+  /** Key for encrypting the persisted conversation at rest (same as the secret store). */
+  private readonly encKey: string
 
   constructor(
     private readonly prisma: PrismaService,
@@ -94,6 +97,21 @@ export class LlmAgentService {
       openai: new OpenAiClient(undefined, config.get<string>("OPENAI_DEFAULT_MODEL")),
       gemini: new GeminiClient(undefined, config.get<string>("GEMINI_DEFAULT_MODEL")),
     }
+    this.encKey =
+      config.get<string>("SETTINGS_ENCRYPTION_KEY") ?? "0123456789abcdef0123456789abcdef"
+  }
+
+  /**
+   * The persisted conversation (`messages`, `system`) is encrypted at rest: a
+   * prompt resolved from `={{ secrets.X }}` would otherwise sit in the DB in
+   * plaintext, defeating the secret store's encryption. Encrypting (not masking)
+   * preserves the values for replay across resumed turns.
+   */
+  private encMessages(messages: unknown[]): string {
+    return encryptSecret(toJson(messages), this.encKey)
+  }
+  private decMessages(stored: string): unknown[] {
+    return fromJson<unknown[]>(decryptSecret(stored, this.encKey), [])
   }
 
   /** First turn (called by LlmExecutor for a tools node). Returns an ExecResult to the engine. */
@@ -106,12 +124,12 @@ export class LlmAgentService {
     const base = {
       status: "RUNNING_TURN",
       turn: 0,
-      messages: toJson(messages),
+      messages: this.encMessages(messages),
       pendingTools: null,
       inputTokens: 0,
       outputTokens: 0,
       model,
-      system: system ?? null,
+      system: system ? encryptSecret(system, this.encKey) : null,
     }
     await this.prisma.llmAgentState.upsert({
       where: { flowRunId_nodeId_mapIndex: key },
@@ -156,6 +174,24 @@ export class LlmAgentService {
       const pending = fromJson<PendingTool[]>(state.pendingTools, [])
       const ready = await this.allToolsDone(pending)
       if (!ready) continue
+
+      // The agent NodeRun must be WAITING_CALLBACK before we advance a turn — its
+      // terminal write (finalizeNode) targets that status. Two races make it not so:
+      //   - launch-before-commit: a fast child resumed us before the engine wrote
+      //     WAITING_CALLBACK (node still RUNNING) → reschedule and retry later.
+      //   - SLA watchdog already failed the node (terminal) → stop and tidy state.
+      const node = await this.prisma.nodeRun.findFirst({
+        where: { flowRunId, nodeId: state.nodeId, mapIndex: state.mapIndex },
+        select: { status: true },
+      })
+      if (!node || isTerminal(node.status as RunStatus)) {
+        await this.markDone(state) // watchdog/cancel won the node; don't reprocess
+        continue
+      }
+      if (node.status !== RunStatus.WaitingCallback) {
+        await this.scheduleResume(flowRunId) // not suspended yet — retry without consuming the turn
+        continue
+      }
 
       // Claim the turn: only one resume tick advances it.
       const claim = await this.prisma.llmAgentState.updateMany({
@@ -217,7 +253,7 @@ export class LlmAgentService {
     const client = this.clients[tctx.provider]
     if (!client?.stepTools) throw new Error(`Provider "${tctx.provider}" does not support tools`)
 
-    const messages = fromJson<unknown[]>(state.messages, [])
+    const messages = this.decMessages(state.messages)
     const tools = (tctx.cfg.tools ?? []).map((t) => ({
       name: t.name,
       description: t.description,
@@ -277,7 +313,13 @@ export class LlmAgentService {
         tctx.guardrails,
       )
       if (breach) {
-        pending.push({ toolUseId: use.id, toolName: use.name, error: breach })
+        // Feed back the tool name only — don't expose the internal flowId / which
+        // guardrail tripped to the model (it could echo it via a prompt injection).
+        pending.push({
+          toolUseId: use.id,
+          toolName: use.name,
+          error: `Tool "${use.name}" is not permitted`,
+        })
         continue
       }
       const child = await this.launcher.launch({
@@ -300,7 +342,7 @@ export class LlmAgentService {
         inputTokens,
         outputTokens,
         model: step.model,
-        messages: toJson(withAssistant),
+        messages: this.encMessages(withAssistant),
         pendingTools: toJson(pending),
       },
     })
@@ -430,9 +472,12 @@ export class LlmAgentService {
     const where = "id" in key ? { id: key.id } : { flowRunId_nodeId_mapIndex: key }
     const state = await this.prisma.llmAgentState.findUnique({ where })
     if (!state) return
-    const messages = fromJson<unknown[]>(state.messages, [])
+    const messages = this.decMessages(state.messages)
     messages.push({ role: "user", content: blocks })
-    await this.prisma.llmAgentState.update({ where, data: { messages: toJson(messages) } })
+    await this.prisma.llmAgentState.update({
+      where,
+      data: { messages: this.encMessages(messages) },
+    })
   }
 
   private async markDone(
@@ -472,7 +517,7 @@ export class LlmAgentService {
       mapIndex: state.mapIndex,
       provider,
       model: state.model ?? cfg.model ?? client.defaultModel,
-      system: state.system ?? undefined,
+      system: state.system ? decryptSecret(state.system, this.encKey) : undefined,
       apiKey,
       cfg,
       guardrails: def.guardrails,
