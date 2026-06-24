@@ -4,6 +4,7 @@
 import { type ReactNode, useState } from "react"
 import { LogOut, Menu, Settings, Users, Workflow } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
+import { Logo } from "@/components/Logo"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import {
@@ -77,7 +78,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 function Brand() {
   return (
     <NavLink to="/" className="flex items-center gap-2 px-2 py-1">
-      <img src="/icon-32.png" alt="" width={24} height={24} className="rounded" />
+      <Logo className="size-6" />
       <span className="text-base font-bold tracking-tight">tempo-flow</span>
     </NavLink>
   )

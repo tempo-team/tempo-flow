@@ -4,6 +4,8 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { ThemeProvider } from "next-themes"
+import "@fontsource-variable/geist"
+import "@fontsource-variable/geist-mono"
 import { Toaster } from "@/components/ui/sonner"
 import { App } from "./App"
 import "./index.css"

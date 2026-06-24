@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.0.0",
+    "@fontsource-variable/geist": "^5.2.9",
+    "@fontsource-variable/geist-mono": "^5.2.8",
     "@tailwindcss/vite": "^4.3.1",
     "@tempo-flow/shared-types": "workspace:*",
     "@xyflow/react": "^12.11.0",

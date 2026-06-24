@@ -4,6 +4,7 @@
 import { type FormEvent, useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { Logo } from "@/components/Logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -49,13 +50,7 @@ export function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="space-y-3">
           <div className="flex items-center gap-3">
-            <img
-              src="/icon-64.png"
-              alt="tempo-flow"
-              width={40}
-              height={40}
-              className="rounded-lg"
-            />
+            <Logo className="size-10" />
             <div>
               <CardTitle className="text-xl">tempo-flow</CardTitle>
               <CardDescription>Sign in to your workspace</CardDescription>
