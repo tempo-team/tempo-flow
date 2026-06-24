@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "./lib/auth"
 import { DashboardPage } from "./pages/DashboardPage"
 import { FlowEditorPage } from "./pages/FlowEditorPage"
 import { FlowPage } from "./pages/FlowPage"
+import { IntegrationPage } from "./pages/IntegrationPage"
 import { LoginPage } from "./pages/LoginPage"
 import { MembersPage } from "./pages/MembersPage"
 import { SettingsPage } from "./pages/SettingsPage"
@@ -67,6 +68,14 @@ export function App() {
             element={
               <RequireAuth>
                 <FlowPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/integration"
+            element={
+              <RequireAuth>
+                <IntegrationPage />
               </RequireAuth>
             }
           />

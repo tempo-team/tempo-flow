@@ -21,7 +21,8 @@ progress and resumes across worker restarts.
 **Orchestration & reliability**
 
 - **Durable checkpoint-resume engine** — a run survives worker restarts; long
-  external jobs report back via async completion callbacks instead of holding a worker.
+  external jobs report back via async completion callbacks instead of holding a
+  worker ([how jobs report results](./docs/callbacks.md)).
 - **Second-level cron** (6-field via Croner) plus manual, webhook, and event
   triggers, and date-range backfill.
 - **Multi follow-up + conditional branching** — fan out on success / failure / always.

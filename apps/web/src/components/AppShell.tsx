@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { type ReactNode, useState } from "react"
-import { LogOut, Menu, Settings, Users, Workflow } from "lucide-react"
+import { LogOut, Menu, Plug, Settings, Users, Workflow } from "lucide-react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import { Logo } from "@/components/Logo"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -33,6 +33,13 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { pathname } = useLocation()
   const items: NavItem[] = [
     { to: "/", label: "Flows", icon: Workflow, show: true, activePrefix: "/flows" },
+    {
+      to: "/integration",
+      label: "Integration",
+      icon: Plug,
+      show: true,
+      activePrefix: "/integration",
+    },
     {
       to: "/members",
       label: "Members",

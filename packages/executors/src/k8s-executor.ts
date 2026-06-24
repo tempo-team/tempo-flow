@@ -40,15 +40,22 @@ export function k8sName(...parts: string[]): string {
 export function buildJobManifest(
   node: FlowNode,
   params: Record<string, string>,
-  opts: { jobName: string },
+  opts: { jobName: string; callback?: { url: string; token: string } },
 ): V1Job {
   const cfg = node.executor as K8sExecutorConfig
   const paramsAs = cfg.paramsAs ?? "env"
 
-  const env =
-    paramsAs === "env"
-      ? Object.entries(params).map(([name, value]) => ({ name, value }))
-      : undefined
+  const envVars =
+    paramsAs === "env" ? Object.entries(params).map(([name, value]) => ({ name, value })) : []
+  // Completion-callback coordinates are always injected as env (independent of how
+  // params are passed) so a callback-mode Job can report its result back.
+  if (opts.callback) {
+    envVars.push(
+      { name: "TEMPO_CALLBACK_URL", value: opts.callback.url },
+      { name: "TEMPO_CALLBACK_TOKEN", value: opts.callback.token },
+    )
+  }
+  const env = envVars.length > 0 ? envVars : undefined
 
   const extraArgs = paramsAs === "args" ? Object.entries(params).map(([k, v]) => `--${k}=${v}`) : []
   const args = [...(cfg.args ?? []), ...extraArgs]
@@ -98,7 +105,7 @@ export class K8sExecutor implements JobExecutor {
       secrets: ctx.secrets,
     })
     const jobName = k8sName(node.id, ctx.flowRunId)
-    const manifest = buildJobManifest(node, params, { jobName })
+    const manifest = buildJobManifest(node, params, { jobName, callback: ctx.callback })
     const namespace = cfg.namespace ?? DEFAULT_NAMESPACE
 
     ctx.onLog?.(`→ launching Job ${jobName} (${cfg.image}) in ${namespace}`)

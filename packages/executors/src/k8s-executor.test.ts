@@ -49,6 +49,34 @@ describe("buildJobManifest", () => {
     const job = buildJobManifest(k8sNode({ namespace: "batch" } as never), {}, { jobName: "j1" })
     expect(job.metadata?.namespace).toBe("batch")
   })
+
+  it("injects callback coordinates as env when in callback mode", () => {
+    const job = buildJobManifest(
+      k8sNode(),
+      { RUN_DATE: "20260620" },
+      { jobName: "j1", callback: { url: "https://host/api/callbacks/tok", token: "tok" } },
+    )
+    const env = job.spec?.template.spec?.containers[0]?.env
+    expect(env).toContainEqual({
+      name: "TEMPO_CALLBACK_URL",
+      value: "https://host/api/callbacks/tok",
+    })
+    expect(env).toContainEqual({ name: "TEMPO_CALLBACK_TOKEN", value: "tok" })
+  })
+
+  it("injects callback env even when params go to args", () => {
+    const job = buildJobManifest(
+      k8sNode({ paramsAs: "args" } as never),
+      { RUN_DATE: "20260620" },
+      { jobName: "j1", callback: { url: "https://host/api/callbacks/tok", token: "tok" } },
+    )
+    const env = job.spec?.template.spec?.containers[0]?.env
+    expect(env).toContainEqual({
+      name: "TEMPO_CALLBACK_URL",
+      value: "https://host/api/callbacks/tok",
+    })
+    expect(env).not.toContainEqual({ name: "RUN_DATE", value: "20260620" }) // params still go to args
+  })
 })
 
 describe("k8sName", () => {

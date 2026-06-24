@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Plus, X } from "lucide-react"
+import { Link } from "react-router-dom"
 import type {
   DateParam,
   FlowNode,
@@ -440,6 +441,54 @@ export function NodeForm({ node, onChange }: Props) {
             </SelectContent>
           </Select>
         </Field>
+      </div>
+
+      <div className="space-y-3 rounded-md border p-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Completion">
+            <Select
+              value={node.completion ?? "sync"}
+              onValueChange={(v) =>
+                patch({ completion: v === "sync" ? undefined : (v as "callback") })
+              }
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sync">sync (immediate)</SelectItem>
+                <SelectItem value="callback">callback (async)</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          {node.completion === "callback" && (
+            <Field label="Callback timeout (ms)">
+              <Input
+                type="number"
+                value={node.callbackTimeoutMs ?? ""}
+                onChange={(e) =>
+                  patch({
+                    callbackTimeoutMs: e.target.value ? Number(e.target.value) : undefined,
+                  })
+                }
+                placeholder="1800000"
+                className="h-8 font-mono"
+              />
+            </Field>
+          )}
+        </div>
+        {node.completion === "callback" && (
+          <p className="text-xs text-muted-foreground">
+            Downstream nodes wait until the job reports its result. The job receives{" "}
+            <code className="font-mono">TEMPO_CALLBACK_URL</code> (env — or the{" "}
+            <code className="font-mono">x-tempo-callback-url</code> header for HTTP) and POSTs{" "}
+            <code className="font-mono">{"{ status, output }"}</code> back. See{" "}
+            <Link to="/integration" className="text-primary underline">
+              Integration
+            </Link>{" "}
+            for per-language examples.
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
