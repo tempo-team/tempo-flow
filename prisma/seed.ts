@@ -56,7 +56,6 @@ const ROLE_PERMISSIONS: Record<string, Perm[] | "all"> = {
     { action: "view", resource: "flow" },
     { action: "view", resource: "run" },
     { action: "view", resource: "history" },
-    { action: "view", resource: "setting" },
   ],
 }
 
@@ -94,15 +93,22 @@ async function main(): Promise<void> {
     roleIdByName.set(name, role.id)
 
     const grant = perms === "all" ? PERMISSIONS : perms
+    const grantedIds: string[] = []
     for (const p of grant) {
       const permissionId = permByKey.get(permKey(p))
       if (!permissionId) continue
+      grantedIds.push(permissionId)
       await prisma.rolePermission.upsert({
         where: { roleId_permissionId: { roleId: role.id, permissionId } },
         update: {},
         create: { roleId: role.id, permissionId },
       })
     }
+    // Prune links no longer in the role's grant so removing a permission from the
+    // map actually revokes it on re-seed (upsert alone only ever adds).
+    await prisma.rolePermission.deleteMany({
+      where: { roleId: role.id, permissionId: { notIn: grantedIds } },
+    })
   }
 
   // Default admin user
