@@ -106,3 +106,76 @@ jobs:
             pnpm prisma db push --skip-generate --accept-data-loss
           fi
           pnpm tsx prisma/seed.ts
+
+  # Full black-box integration/E2E suite. The suite self-provisions its infra
+  # (Postgres + Redis via docker compose on alt ports) and runs the real API as a
+  # subprocess, so no GitHub `services:` are needed — just Docker (preinstalled on
+  # ubuntu runners). E2E_DOCKER=1 also exercises the inline-script executor.
+  e2e:
+    name: integration / E2E (core + script)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build API (the suite runs apps/api/dist/main.js)
+        run: pnpm build:api
+      - name: E2E suite
+        run: pnpm test:e2e
+        env:
+          E2E_DOCKER: "1"
+
+  # K8s + Spring Batch executors against a real cluster (minikube). Gated: runs on
+  # main or when a PR carries the `e2e-k8s` label, since spinning up minikube is slow.
+  e2e-k8s:
+    name: E2E — K8s + Spring Batch (minikube)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'e2e-k8s')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: medyagh/setup-minikube@latest
+      - run: pnpm build:api
+      - name: E2E (K8s + Spring Batch)
+        run: pnpm test:e2e
+        env:
+          E2E_K8S: "1"
+          E2E_NAMESPACE: default
+
+  # LLM executor (real provider APIs). Gated to main; provider tests self-skip when
+  # their key secret is absent, so this stays green without keys configured.
+  e2e-llm:
+    name: E2E — LLM
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:api
+      - name: E2E (LLM)
+        run: pnpm test:e2e
+        env:
+          E2E_LLM: "1"
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

@@ -18,6 +18,8 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint -- --fix",
     "test": "turbo run test",
+    "test:e2e": "vitest run --config test/e2e/vitest.config.ts",
+    "test:e2e:typecheck": "tsc -p test/e2e/tsconfig.json --noEmit",
     "dev": "turbo run dev --filter=@tempo-flow/api --filter=@tempo-flow/web",
     "dev:api": "turbo run dev --filter=@tempo-flow/api",
     "dev:web": "turbo run dev --filter=@tempo-flow/web",

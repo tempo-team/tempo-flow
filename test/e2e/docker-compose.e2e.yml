@@ -1,0 +1,34 @@
+# Copyright 2026 The tempo-flow Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Isolated infra for the E2E suite: Postgres + Redis on alternate ports so they
+# never collide with the dev stack (docker-compose.yml uses 5432/6379). tmpfs
+# keeps the DB in memory for fast per-test truncation. Brought up/down by
+# test/e2e/setup/global-setup.ts (project name: tempoflow-e2e).
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: tempo
+      POSTGRES_PASSWORD: tempo
+      POSTGRES_DB: tempo_flow_e2e
+    ports:
+      - "55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tempo"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "56379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
