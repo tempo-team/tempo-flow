@@ -32,7 +32,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Validate Prisma schema
+        # `validate` resolves env("DATABASE_URL") even though it never connects,
+        # so give it a syntactically-valid placeholder (no DB is contacted).
         run: pnpm prisma validate
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
 
       - name: Typecheck
         run: pnpm run typecheck

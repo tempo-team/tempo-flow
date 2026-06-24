@@ -44,7 +44,9 @@ prisma-generate: db-provider
 	pnpm prisma generate
 
 prisma-validate: db-provider
-	pnpm prisma validate
+	# `validate` resolves env("DATABASE_URL") but never connects — fall back to a
+	# placeholder so it works with no DB configured.
+	DATABASE_URL="$${DATABASE_URL:-postgresql://placeholder:placeholder@localhost:5432/placeholder}" pnpm prisma validate
 
 # Apply committed migrations (production / container entrypoint).
 migrate: db-provider
