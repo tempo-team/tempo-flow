@@ -62,12 +62,11 @@ describe("makeSubflowToolRunner", () => {
     })
   })
 
-  it("refuses to launch a tool flow that would cycle", async () => {
+  it("throws (refuses to launch) a tool flow that would cycle", async () => {
     const { run, launch } = build({
       runs: { "run-A": { flowId: "flow-A", parentRunId: null } },
     })
-    const result = await run({ flowId: "flow-A", input: {}, ctx: ctx("run-A") })
-    expect(result).toMatchObject({ error: expect.stringContaining("cycle") })
+    await expect(run({ flowId: "flow-A", input: {}, ctx: ctx("run-A") })).rejects.toThrow(/cycle/)
     expect(launch).not.toHaveBeenCalled()
   })
 

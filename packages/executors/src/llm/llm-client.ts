@@ -43,6 +43,12 @@ export interface LlmResult {
   structured?: unknown
   model: string
   usage: { inputTokens: number; outputTokens: number }
+  /**
+   * True when an agentic tool loop stopped without the model finishing (hit the
+   * turn cap). The executor treats this as a node failure rather than a silent
+   * empty success.
+   */
+  incomplete?: boolean
 }
 
 /**

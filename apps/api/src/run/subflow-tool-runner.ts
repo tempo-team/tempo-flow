@@ -24,9 +24,12 @@ export function makeSubflowToolRunner(
   prisma: PrismaService,
 ): SubflowRunner {
   return async ({ flowId, input, ctx }) => {
+    // Throw on hard failures (cycle, timeout): the LLM adapter catches and marks
+    // the tool_result is_error so the model gets a clear failure signal. Terminal
+    // child runs (incl. FAILED) return data so the model can read status/outputs.
     const cycle = await findFlowCycle(prisma, ctx.flowRunId, flowId)
     if (cycle) {
-      return { error: `Tool sub-flow cycle detected: ${cycle}` }
+      throw new Error(`Tool sub-flow cycle detected: ${cycle}`)
     }
 
     const child = await launcher.launch({
@@ -53,7 +56,7 @@ export function makeSubflowToolRunner(
     }
 
     ctx.onLog?.(`✗ tool sub-flow run ${child.id} timed out`)
-    return { status: "TIMED_OUT", error: `Tool sub-flow ${flowId} timed out` }
+    throw new Error(`Tool sub-flow ${flowId} timed out`)
   }
 }
 

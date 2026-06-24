@@ -120,7 +120,7 @@ export class AnthropicClient implements LlmClient {
           const out = await req.runTool!(use.name, use.input)
           content = JSON.stringify(out ?? null)
         } catch (err) {
-          content = (err as Error).message
+          content = err instanceof Error ? err.message : String(err)
           isError = true
         }
         results.push({
@@ -139,6 +139,7 @@ export class AnthropicClient implements LlmClient {
       structured: undefined,
       model,
       usage: { inputTokens, outputTokens },
+      incomplete: true,
     }
   }
 }

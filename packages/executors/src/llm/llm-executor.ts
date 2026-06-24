@@ -93,7 +93,9 @@ export class LlmExecutor implements JobExecutor {
       tools.length > 0
         ? async (name: string, input: unknown): Promise<unknown> => {
             const tool = tools.find((t) => t.name === name)
-            if (!tool) return { error: `Unknown tool "${name}"` }
+            // Throw (not return) so the adapter marks the tool_result is_error,
+            // giving the model a clear failure signal instead of a silent object.
+            if (!tool) throw new Error(`Unknown tool "${name}"`)
             // biome-ignore lint/style/noNonNullAssertion: guarded above when tools present
             return this.subflowRunner!({ flowId: tool.flowId, input, ctx })
           }
@@ -113,11 +115,24 @@ export class LlmExecutor implements JobExecutor {
         maxToolTurns: cfg.maxToolTurns,
         onLog: ctx.onLog,
       })
+      const response = { model: result.model, usage: result.usage }
+      // An agentic loop that exhausted its turn budget produced no final answer —
+      // fail the node rather than record an empty success.
+      if (result.incomplete) {
+        return {
+          ok: false,
+          request,
+          response,
+          errorMessage: `Tool loop did not finish within ${cfg.maxToolTurns ?? 5} turns`,
+        }
+      }
       return {
         ok: true,
         request,
-        response: { model: result.model, usage: result.usage },
-        output: cfg.outputSchema ? result.structured : { text: result.text },
+        response,
+        // Prefer structured output when the model produced it; fall back to text
+        // (e.g. tool loops don't force a schema, so structured may be absent).
+        output: result.structured !== undefined ? result.structured : { text: result.text },
       }
     } catch (err) {
       return { ok: false, request, errorMessage: (err as Error).message }

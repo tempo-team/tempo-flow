@@ -157,12 +157,21 @@ describe("LlmExecutor", () => {
       expect(result.request).toMatchObject({ tools: 1 })
     })
 
-    it("returns an error result from runTool for an unknown tool name", async () => {
+    it("throws from runTool for an unknown tool name (surfaces as is_error)", async () => {
       const { client, seen } = fakeClient()
       const exec = new LlmExecutor({ anthropic: client }, async () => ({ status: "SUCCESS" }))
       await exec.execute(node(toolCfg), ctx())
-      const out = await seen[0].runTool?.("nope", {})
-      expect(out).toMatchObject({ error: expect.stringContaining("nope") })
+      await expect(seen[0].runTool?.("nope", {})).rejects.toThrow(/nope/)
+    })
+
+    it("fails the node when the tool loop is incomplete (hit max turns)", async () => {
+      const { client } = fakeClient({ text: "", incomplete: true })
+      const exec = new LlmExecutor({ anthropic: client }, async () => ({ status: "SUCCESS" }))
+      const result = await exec.execute(node(toolCfg), ctx())
+      expect(result.ok).toBe(false)
+      expect(result.errorMessage).toMatch(/did not finish/)
+      // usage is still recorded for cost observability
+      expect(result.response).toMatchObject({ usage: { inputTokens: 10, outputTokens: 5 } })
     })
 
     it("fails when tools are set but no subflow runner is configured", async () => {
