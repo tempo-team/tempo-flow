@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Check, Copy } from "lucide-react"
+import { useTheme } from "next-themes"
+import { Highlight, themes } from "prism-react-renderer"
 import { useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import "@/lib/prism-setup" // registers extra Prism grammars (bash) before highlighting
+import { cn } from "@/lib/utils"
 
 /**
  * How an external job reports its result back to the flow API (async completion
@@ -18,6 +22,7 @@ const LANGUAGES = [
   {
     id: "curl",
     label: "curl",
+    prism: "bash",
     code: `# success
 curl -X POST "$TEMPO_CALLBACK_URL" \\
   -H "Content-Type: application/json" \\
@@ -31,6 +36,7 @@ curl -X POST "$TEMPO_CALLBACK_URL" \\
   {
     id: "node",
     label: "Node.js",
+    prism: "javascript",
     code: `const url = process.env.TEMPO_CALLBACK_URL
 
 await fetch(url, {
@@ -42,6 +48,7 @@ await fetch(url, {
   {
     id: "python",
     label: "Python",
+    prism: "python",
     code: `import os, json, urllib.request
 
 req = urllib.request.Request(
@@ -55,6 +62,7 @@ urllib.request.urlopen(req)`,
   {
     id: "go",
     label: "Go",
+    prism: "go",
     code: `body, _ := json.Marshal(map[string]any{
     "status": "success",
     "output": map[string]int{"rows": 42},
@@ -64,6 +72,7 @@ http.Post(os.Getenv("TEMPO_CALLBACK_URL"), "application/json", bytes.NewReader(b
   {
     id: "java",
     label: "Java",
+    prism: "java",
     code: `String body = "{\\"status\\":\\"success\\",\\"output\\":{\\"rows\\":42}}";
 HttpRequest req = HttpRequest.newBuilder(URI.create(System.getenv("TEMPO_CALLBACK_URL")))
     .header("Content-Type", "application/json")
@@ -73,7 +82,9 @@ HttpClient.newHttpClient().send(req, HttpResponse.BodyHandlers.discarding());`,
   },
 ] as const
 
-function CodeBlock({ code }: { code: string }) {
+function CodeBlock({ code, lang = "bash" }: { code: string; lang?: string }) {
+  const { resolvedTheme } = useTheme()
+  const theme = resolvedTheme === "dark" ? themes.oneDark : themes.oneLight
   const [copied, setCopied] = useState(false)
   async function copy(): Promise<void> {
     try {
@@ -90,15 +101,33 @@ function CodeBlock({ code }: { code: string }) {
         type="button"
         variant="ghost"
         size="icon-sm"
-        className="absolute right-2 top-2"
+        className="absolute right-2 top-2 z-10"
         onClick={copy}
         aria-label="Copy"
       >
         {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
       </Button>
-      <pre className="overflow-x-auto rounded-md border bg-muted/40 p-4 font-mono text-xs leading-relaxed">
-        {code}
-      </pre>
+      <Highlight code={code} language={lang} theme={theme}>
+        {({ className, style, tokens, getLineProps, getTokenProps }) => (
+          <pre
+            className={cn(
+              className,
+              "overflow-x-auto rounded-md border p-4 font-mono text-xs leading-relaxed",
+            )}
+            style={style}
+          >
+            {tokens.map((line, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: stable source lines
+              <div key={i} {...getLineProps({ line })}>
+                {line.map((token, key) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: stable token order
+                  <span key={key} {...getTokenProps({ token })} />
+                ))}
+              </div>
+            ))}
+          </pre>
+        )}
+      </Highlight>
     </div>
   )
 }
@@ -180,7 +209,7 @@ export function IntegrationPage() {
             </TabsList>
             {LANGUAGES.map((l) => (
               <TabsContent key={l.id} value={l.id}>
-                <CodeBlock code={l.code} />
+                <CodeBlock code={l.code} lang={l.prism} />
               </TabsContent>
             ))}
           </Tabs>
