@@ -64,8 +64,8 @@ http.Post(os.Getenv("TEMPO_CALLBACK_URL"), "application/json", bytes.NewReader(b
   {
     id: "java",
     label: "Java",
-    code: `var body = "{\\"status\\":\\"success\\",\\"output\\":{\\"rows\\":42}}";
-var req = HttpRequest.newBuilder(URI.create(System.getenv("TEMPO_CALLBACK_URL")))
+    code: `String body = "{\\"status\\":\\"success\\",\\"output\\":{\\"rows\\":42}}";
+HttpRequest req = HttpRequest.newBuilder(URI.create(System.getenv("TEMPO_CALLBACK_URL")))
     .header("Content-Type", "application/json")
     .POST(HttpRequest.BodyPublishers.ofString(body))
     .build();
