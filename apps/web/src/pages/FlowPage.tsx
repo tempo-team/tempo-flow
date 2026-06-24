@@ -31,6 +31,7 @@ import { type FlowRunSummary, type FlowSummary, api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { flowNodeTypes } from "@/features/flow-editor/FlowNode"
 import { toReactFlow } from "@/lib/flow-graph"
+import { cn } from "@/lib/utils"
 import { useRunStream } from "@/lib/useRunStream"
 
 export function FlowPage() {
@@ -41,6 +42,7 @@ export function FlowPage() {
   const [flow, setFlow] = useState<FlowSummary | null>(null)
   const [runs, setRuns] = useState<FlowRunSummary[]>([])
   const [selectedRun, setSelectedRun] = useState<string | null>(null)
+  const [nodeStatus, setNodeStatus] = useState<Record<string, string>>({})
   const [toDelete, setToDelete] = useState<FlowSummary | null>(null)
 
   function reloadRuns(): void {
@@ -58,9 +60,29 @@ export function FlowPage() {
     reloadRuns()
   }, [id])
 
-  // Live runs table: reload when a run for this flow changes status.
+  // Overlay the selected run's per-node statuses onto the DAG (cleared when none).
+  useEffect(() => {
+    if (!selectedRun) {
+      setNodeStatus({})
+      return
+    }
+    api
+      .getRun(selectedRun)
+      .then((run) => {
+        const map: Record<string, string> = {}
+        for (const nr of run.nodeRuns ?? []) map[nr.nodeId] = nr.status
+        setNodeStatus(map)
+      })
+      .catch(() => undefined)
+  }, [selectedRun])
+
+  // Live: reload the runs table on any run change; live-update the overlay for the
+  // selected run as its nodes change status.
   useRunStream("*", (event) => {
     if (event.kind === "run.status" && event.flowId === id) reloadRuns()
+    if (event.kind === "node.status" && event.flowRunId === selectedRun) {
+      setNodeStatus((m) => ({ ...m, [event.nodeId]: event.status }))
+    }
   })
 
   async function exportYaml(): Promise<void> {
@@ -79,6 +101,12 @@ export function FlowPage() {
   }
 
   const graph = useMemo(() => (flow ? toReactFlow(flow.definition) : null), [flow])
+  // Inject the selected run's per-node statuses onto the DAG nodes for the overlay.
+  const overlayNodes = useMemo(
+    () =>
+      (graph?.nodes ?? []).map((n) => ({ ...n, data: { ...n.data, status: nodeStatus[n.id] } })),
+    [graph, nodeStatus],
+  )
 
   if (!flow || !graph) return <div className="p-6 text-muted-foreground">Loading…</div>
 
@@ -136,7 +164,7 @@ export function FlowPage() {
         <CardContent className="p-0">
           <div className="h-[560px] overflow-hidden rounded-xl bg-muted/20">
             <ReactFlow
-              nodes={graph.nodes}
+              nodes={overlayNodes}
               edges={graph.edges}
               nodeTypes={flowNodeTypes}
               fitView
@@ -179,7 +207,10 @@ export function FlowPage() {
                   {runs.map((run) => (
                     <TableRow
                       key={run.id}
-                      className="cursor-pointer"
+                      className={cn(
+                        "cursor-pointer",
+                        selectedRun === run.id && "bg-accent/60 hover:bg-accent/60",
+                      )}
                       onClick={() => setSelectedRun(run.id)}
                     >
                       <TableCell>
