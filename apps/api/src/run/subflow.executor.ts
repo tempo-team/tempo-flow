@@ -9,6 +9,7 @@ import {
   isTerminal,
 } from "@tempo-flow/shared-types"
 import type { PrismaService } from "../prisma/prisma.service"
+import { findFlowCycle } from "./subflow-cycle"
 import type { RunLauncherService } from "./run-launcher.service"
 
 const POLL_INTERVAL_MS = 1000
@@ -38,7 +39,7 @@ export class SubflowExecutor implements JobExecutor {
     const cfg = node.executor as SubflowExecutorConfig
     const childFlowId = cfg.flowId
 
-    const cycle = await this.findCycle(ctx.flowRunId, childFlowId)
+    const cycle = await findFlowCycle(this.prisma, ctx.flowRunId, childFlowId)
     if (cycle) {
       return { ok: false, errorMessage: `Sub-flow cycle detected: ${cycle}` }
     }
@@ -78,30 +79,5 @@ export class SubflowExecutor implements JobExecutor {
       response: { childRunId: child.id },
       errorMessage: `Sub-flow ${childFlowId} timed out after ${timeoutMs}ms`,
     }
-  }
-
-  /**
-   * Walk the parentRunId chain from the current run upward. If the child flow
-   * we are about to launch already appears in the ancestry (including the
-   * current run's own flow), launching it would recurse — return a readable
-   * path describing the cycle. Bounded to avoid pathological chains.
-   */
-  private async findCycle(flowRunId: string, childFlowId: string): Promise<string | null> {
-    const chain: string[] = []
-    let cursor: string | null = flowRunId
-    for (let depth = 0; cursor && depth < 50; depth++) {
-      const run: { flowId: string; parentRunId: string | null } | null =
-        await this.prisma.flowRun.findUnique({
-          where: { id: cursor },
-          select: { flowId: true, parentRunId: true },
-        })
-      if (!run) break
-      chain.push(run.flowId)
-      if (run.flowId === childFlowId) {
-        return [...chain].reverse().concat(childFlowId).join(" → ")
-      }
-      cursor = run.parentRunId
-    }
-    return null
   }
 }

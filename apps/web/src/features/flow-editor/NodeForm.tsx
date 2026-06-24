@@ -49,6 +49,10 @@ export function NodeForm({ node, onChange }: Props) {
   function patchExecutor(p: Record<string, unknown>): void {
     onChange({ ...node, executor: { ...node.executor, ...p } as FlowNode["executor"] })
   }
+  function patchTool(i: number, p: Partial<NonNullable<LlmExecutorConfig["tools"]>[number]>): void {
+    const tools = (llm.tools ?? []).map((t, j) => (j === i ? { ...t, ...p } : t))
+    patchExecutor({ tools })
+  }
 
   const dateParams = node.params?.dateParams ?? []
   function setDateParams(next: DateParam[]): void {
@@ -174,9 +178,84 @@ export function NodeForm({ node, onChange }: Props) {
               />
             </Field>
           </div>
+          <div className="space-y-2 rounded-md border border-dashed p-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium">Tools (agentic — Anthropic only)</span>
+              <button
+                type="button"
+                className="rounded border px-2 py-0.5 text-xs"
+                onClick={() =>
+                  patchExecutor({
+                    tools: [
+                      ...(llm.tools ?? []),
+                      {
+                        name: "",
+                        description: "",
+                        inputSchema: { type: "object" },
+                        flowId: "",
+                      },
+                    ],
+                  })
+                }
+              >
+                + Add tool
+              </button>
+            </div>
+            {(llm.tools ?? []).map((tool, i) => (
+              <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: tools are an ordered, editable list
+                key={i}
+                className="grid grid-cols-2 gap-2 rounded border p-2"
+              >
+                <Input
+                  value={tool.name}
+                  onChange={(e) => patchTool(i, { name: e.target.value })}
+                  placeholder="tool name"
+                  className="h-7 font-mono text-xs"
+                />
+                <Input
+                  value={tool.flowId}
+                  onChange={(e) => patchTool(i, { flowId: e.target.value })}
+                  placeholder="flow id"
+                  className="h-7 font-mono text-xs"
+                />
+                <Input
+                  value={tool.description}
+                  onChange={(e) => patchTool(i, { description: e.target.value })}
+                  placeholder="when to use this tool"
+                  className="col-span-2 h-7 text-xs"
+                />
+                <button
+                  type="button"
+                  className="col-span-2 text-left text-xs text-muted-foreground hover:text-destructive"
+                  onClick={() =>
+                    patchExecutor({ tools: (llm.tools ?? []).filter((_, j) => j !== i) })
+                  }
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            {(llm.tools ?? []).length > 0 ? (
+              <Field label="Max tool turns">
+                <Input
+                  type="number"
+                  value={llm.maxToolTurns ?? ""}
+                  onChange={(e) =>
+                    patchExecutor({
+                      maxToolTurns: e.target.value ? Number(e.target.value) : undefined,
+                    })
+                  }
+                  placeholder="5"
+                  className="h-7 w-24 font-mono text-xs"
+                />
+              </Field>
+            ) : null}
+          </div>
           <p className="text-xs text-muted-foreground">
             Prompt/system support <code>={"{{ }}"}</code> expressions. Set an{" "}
-            <code>outputSchema</code> via YAML import to force structured JSON into the node output.
+            <code>outputSchema</code> or each tool's <code>inputSchema</code> via YAML import. Each
+            tool runs its flow as a sub-flow and returns its outputs to the model.
           </p>
         </div>
       ) : node.executor.type === "script" ? (

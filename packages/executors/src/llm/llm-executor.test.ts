@@ -121,4 +121,67 @@ describe("LlmExecutor", () => {
     )
     expect(seen[0].apiKey).toBe("sk-custom")
   })
+
+  describe("agentic tools", () => {
+    const toolCfg = {
+      type: "llm",
+      prompt: "do it",
+      tools: [
+        {
+          name: "lookup",
+          description: "look something up",
+          inputSchema: { type: "object" },
+          flowId: "flow-tool",
+        },
+      ],
+      maxToolTurns: 3,
+    }
+
+    it("forwards tools and a runTool that dispatches to the subflow runner", async () => {
+      const { client, seen } = fakeClient()
+      const calls: { flowId: string; input: unknown }[] = []
+      const exec = new LlmExecutor({ anthropic: client }, async ({ flowId, input }) => {
+        calls.push({ flowId, input })
+        return { status: "SUCCESS" }
+      })
+      const result = await exec.execute(node(toolCfg), ctx())
+      expect(result.ok).toBe(true)
+      expect(seen[0].tools).toEqual([
+        { name: "lookup", description: "look something up", inputSchema: { type: "object" } },
+      ])
+      expect(seen[0].maxToolTurns).toBe(3)
+      // The runTool wired into the request routes by tool name → flowId.
+      const out = await seen[0].runTool?.("lookup", { q: "hi" })
+      expect(out).toEqual({ status: "SUCCESS" })
+      expect(calls).toEqual([{ flowId: "flow-tool", input: { q: "hi" } }])
+      expect(result.request).toMatchObject({ tools: 1 })
+    })
+
+    it("returns an error result from runTool for an unknown tool name", async () => {
+      const { client, seen } = fakeClient()
+      const exec = new LlmExecutor({ anthropic: client }, async () => ({ status: "SUCCESS" }))
+      await exec.execute(node(toolCfg), ctx())
+      const out = await seen[0].runTool?.("nope", {})
+      expect(out).toMatchObject({ error: expect.stringContaining("nope") })
+    })
+
+    it("fails when tools are set but no subflow runner is configured", async () => {
+      const { client } = fakeClient()
+      const exec = new LlmExecutor({ anthropic: client }) // no runner
+      const result = await exec.execute(node(toolCfg), ctx())
+      expect(result.ok).toBe(false)
+      expect(result.errorMessage).toMatch(/subflow runner/i)
+    })
+
+    it("rejects tool use for non-anthropic providers", async () => {
+      const openai: LlmClient = { ...fakeClient().client, provider: "openai" }
+      const exec = new LlmExecutor({ anthropic: fakeClient().client, openai }, async () => ({}))
+      const result = await exec.execute(
+        node({ ...toolCfg, provider: "openai" }),
+        ctx({ secrets: { OPENAI_API_KEY: "k" } }),
+      )
+      expect(result.ok).toBe(false)
+      expect(result.errorMessage).toMatch(/anthropic/)
+    })
+  })
 })

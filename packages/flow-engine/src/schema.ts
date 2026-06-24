@@ -33,6 +33,13 @@ const scriptExecutorSchema = z.object({
   network: z.boolean().optional(),
 })
 
+const llmToolSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().min(1),
+  inputSchema: z.record(z.string(), z.unknown()),
+  flowId: z.string().min(1),
+})
+
 const llmExecutorSchema = z.object({
   type: z.literal("llm"),
   provider: z.enum(["anthropic", "openai", "gemini"]).optional(),
@@ -43,6 +50,8 @@ const llmExecutorSchema = z.object({
   effort: z.enum(["low", "medium", "high"]).optional(),
   outputSchema: z.record(z.string(), z.unknown()).optional(),
   apiKeySecret: z.string().min(1).optional(),
+  tools: z.array(llmToolSchema).optional(),
+  maxToolTurns: z.number().int().positive().optional(),
 })
 
 const executorSchema = z.discriminatedUnion("type", [

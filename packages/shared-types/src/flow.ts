@@ -50,6 +50,19 @@ export interface ScriptExecutorConfig {
 
 export type LlmProvider = "anthropic" | "openai" | "gemini"
 
+/**
+ * A tool the model can call during an agentic turn. Each tool runs a sub-flow:
+ * the model's tool input becomes the sub-flow's params, and the sub-flow's node
+ * outputs are returned to the model as the tool result.
+ */
+export interface LlmToolConfig {
+  name: string
+  description: string
+  inputSchema: Record<string, unknown>
+  /** The flow to run when the model calls this tool. */
+  flowId: string
+}
+
 export interface LlmExecutorConfig {
   type: "llm"
   /** Which model provider to call (default "anthropic"). */
@@ -69,6 +82,10 @@ export interface LlmExecutorConfig {
   outputSchema?: Record<string, unknown>
   /** Secret key holding the API key (defaults to the provider's standard name). */
   apiKeySecret?: string
+  /** Agentic tools the model may call (each runs a sub-flow). Anthropic only for now. */
+  tools?: LlmToolConfig[]
+  /** Max tool-calling turns before giving up (default 5). */
+  maxToolTurns?: number
 }
 
 export type ExecutorConfig =

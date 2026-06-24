@@ -70,4 +70,113 @@ describe("AnthropicClient", () => {
     await client.complete({ apiKey: "k2", model: "m", prompt: "c" })
     expect(factory).toHaveBeenCalledTimes(2) // k1 reused, k2 new
   })
+
+  describe("tool-use loop", () => {
+    it("runs each requested tool, feeds results back, and returns the final text", async () => {
+      // Turn 1: model asks for a tool. Turn 2: model answers.
+      const create = vi
+        .fn()
+        .mockResolvedValueOnce({
+          content: [{ type: "tool_use", id: "tu_1", name: "lookup", input: { q: "weather" } }],
+          model: "claude-opus-4-8",
+          stop_reason: "tool_use",
+          usage: { input_tokens: 10, output_tokens: 4 },
+        })
+        .mockResolvedValueOnce({
+          content: [{ type: "text", text: "It is sunny." }],
+          model: "claude-opus-4-8",
+          stop_reason: "end_turn",
+          usage: { input_tokens: 20, output_tokens: 6 },
+        })
+      const sdk = { messages: { create } } as unknown as Anthropic
+      const client = new AnthropicClient(() => sdk)
+
+      const ran: { name: string; input: unknown }[] = []
+      const result = await client.complete({
+        apiKey: "k",
+        model: "claude-opus-4-8",
+        prompt: "what is the weather",
+        tools: [{ name: "lookup", description: "d", inputSchema: { type: "object" } }],
+        runTool: async (name, input) => {
+          ran.push({ name, input })
+          return { temp: 25 }
+        },
+      })
+
+      expect(result.text).toBe("It is sunny.")
+      // usage is summed across both turns
+      expect(result.usage).toEqual({ inputTokens: 30, outputTokens: 10 })
+      expect(ran).toEqual([{ name: "lookup", input: { q: "weather" } }])
+
+      // First call sends tools; second call replays assistant tool_use + tool_result.
+      const firstBody = create.mock.calls[0][0]
+      expect(firstBody.tools).toEqual([
+        { name: "lookup", description: "d", input_schema: { type: "object" } },
+      ])
+      const secondBody = create.mock.calls[1][0]
+      expect(secondBody.messages).toHaveLength(3)
+      expect(secondBody.messages[2]).toEqual({
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: "tu_1",
+            content: JSON.stringify({ temp: 25 }),
+            is_error: false,
+          },
+        ],
+      })
+    })
+
+    it("reports tool errors back to the model as tool_result is_error", async () => {
+      const create = vi
+        .fn()
+        .mockResolvedValueOnce({
+          content: [{ type: "tool_use", id: "tu_1", name: "boom", input: {} }],
+          model: "claude-opus-4-8",
+          stop_reason: "tool_use",
+          usage: { input_tokens: 1, output_tokens: 1 },
+        })
+        .mockResolvedValueOnce({
+          content: [{ type: "text", text: "handled" }],
+          model: "claude-opus-4-8",
+          stop_reason: "end_turn",
+          usage: { input_tokens: 1, output_tokens: 1 },
+        })
+      const sdk = { messages: { create } } as unknown as Anthropic
+      const client = new AnthropicClient(() => sdk)
+      await client.complete({
+        apiKey: "k",
+        model: "claude-opus-4-8",
+        prompt: "go",
+        tools: [{ name: "boom", description: "d", inputSchema: { type: "object" } }],
+        runTool: async () => {
+          throw new Error("kaboom")
+        },
+      })
+      const result = create.mock.calls[1][0].messages[2].content[0]
+      expect(result).toMatchObject({ is_error: true, content: "kaboom" })
+    })
+
+    it("stops at maxToolTurns when the model keeps calling tools", async () => {
+      const create = vi.fn().mockResolvedValue({
+        content: [{ type: "tool_use", id: "tu", name: "loop", input: {} }],
+        model: "claude-opus-4-8",
+        stop_reason: "tool_use",
+        usage: { input_tokens: 1, output_tokens: 1 },
+      })
+      const sdk = { messages: { create } } as unknown as Anthropic
+      const client = new AnthropicClient(() => sdk)
+      const result = await client.complete({
+        apiKey: "k",
+        model: "claude-opus-4-8",
+        prompt: "go",
+        tools: [{ name: "loop", description: "d", inputSchema: { type: "object" } }],
+        runTool: async () => ({}),
+        maxToolTurns: 2,
+      })
+      expect(create).toHaveBeenCalledTimes(2)
+      expect(result.text).toBe("")
+    })
+  })
 })

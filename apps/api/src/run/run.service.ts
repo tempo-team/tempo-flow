@@ -33,6 +33,7 @@ import { PrismaService } from "../prisma/prisma.service"
 import { SecretService } from "../secret/secret.service"
 import { ExecutionEngine, type NodeRunRecorder } from "./execution.engine"
 import { RunLauncherService } from "./run-launcher.service"
+import { makeSubflowToolRunner } from "./subflow-tool-runner"
 import { SubflowExecutor } from "./subflow.executor"
 import type { ManualRunRequest } from "./dto/run.request"
 
@@ -65,12 +66,16 @@ export class RunService implements NodeRunRecorder {
         new DockerScriptRunner(this.config.get<string>("DOCKER_PATH") ?? "docker"),
       ),
       // LLM nodes call Claude/OpenAI/Gemini; API keys come from the secret store.
-      // Default models are overridable via env and per-node `model`.
-      llm: new LlmExecutor({
-        anthropic: new AnthropicClient(),
-        openai: new OpenAiClient(undefined, this.config.get<string>("OPENAI_DEFAULT_MODEL")),
-        gemini: new GeminiClient(undefined, this.config.get<string>("GEMINI_DEFAULT_MODEL")),
-      }),
+      // Default models are overridable via env and per-node `model`. The subflow
+      // tool runner turns agentic tool calls into child flow runs.
+      llm: new LlmExecutor(
+        {
+          anthropic: new AnthropicClient(),
+          openai: new OpenAiClient(undefined, this.config.get<string>("OPENAI_DEFAULT_MODEL")),
+          gemini: new GeminiClient(undefined, this.config.get<string>("GEMINI_DEFAULT_MODEL")),
+        },
+        makeSubflowToolRunner(this.launcher, this.prisma),
+      ),
     }
     // Base URL handed to callback-mode jobs so they can report completion.
     const callbackBaseUrl = this.config.get<string>("PUBLIC_URL") ?? "http://localhost:3000"

@@ -3,6 +3,19 @@
 
 import type { LlmProvider } from "@tempo-flow/shared-types"
 
+/** A tool the model may call during an agentic turn. */
+export interface LlmTool {
+  name: string
+  description: string
+  inputSchema: Record<string, unknown>
+}
+
+/**
+ * Executes a tool the model asked for and returns the result fed back to it.
+ * In tempo-flow this runs the tool's sub-flow and returns its node outputs.
+ */
+export type ToolRunner = (name: string, input: unknown) => Promise<unknown>
+
 /** A single model completion request, provider-agnostic. */
 export interface LlmRequest {
   apiKey: string
@@ -13,6 +26,12 @@ export interface LlmRequest {
   effort?: "low" | "medium" | "high"
   /** JSON Schema — when set, the provider is forced to return matching JSON. */
   outputSchema?: Record<string, unknown>
+  /** Tools the model may call. When set with `runTool`, the adapter runs an agentic loop. */
+  tools?: LlmTool[]
+  /** Invoked when the model calls a tool; its result is returned to the model. */
+  runTool?: ToolRunner
+  /** Max tool-calling turns before stopping (default 5). */
+  maxToolTurns?: number
   /** Stream progress lines (best-effort). */
   onLog?: (line: string) => void
 }
