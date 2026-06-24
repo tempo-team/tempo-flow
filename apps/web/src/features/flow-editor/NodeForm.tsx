@@ -7,6 +7,7 @@ import type {
   FlowNode,
   HttpExecutorConfig,
   K8sExecutorConfig,
+  LlmExecutorConfig,
   ScriptExecutorConfig,
   SubflowExecutorConfig,
 } from "@tempo-flow/shared-types"
@@ -23,6 +24,7 @@ import {
 import {
   defaultHttpExecutor,
   defaultK8sExecutor,
+  defaultLlmExecutor,
   defaultScriptExecutor,
   defaultSubflowExecutor,
 } from "./state"
@@ -39,6 +41,7 @@ export function NodeForm({ node, onChange }: Props) {
   const k8s = node.executor as K8sExecutorConfig
   const subflow = node.executor as SubflowExecutorConfig
   const script = node.executor as ScriptExecutorConfig
+  const llm = node.executor as LlmExecutorConfig
 
   function patch(p: Partial<FlowNode>): void {
     onChange({ ...node, ...p })
@@ -79,7 +82,9 @@ export function NodeForm({ node, onChange }: Props) {
                     ? defaultK8sExecutor()
                     : t === "script"
                       ? defaultScriptExecutor()
-                      : defaultSubflowExecutor(),
+                      : t === "llm"
+                        ? defaultLlmExecutor()
+                        : defaultSubflowExecutor(),
             })
           }
         >
@@ -90,12 +95,91 @@ export function NodeForm({ node, onChange }: Props) {
             <SelectItem value="http">HTTP</SelectItem>
             <SelectItem value="k8s">Kubernetes Job</SelectItem>
             <SelectItem value="script">Script</SelectItem>
+            <SelectItem value="llm">LLM</SelectItem>
             <SelectItem value="subflow">Sub-flow</SelectItem>
           </SelectContent>
         </Select>
       </Field>
 
-      {node.executor.type === "script" ? (
+      {node.executor.type === "llm" ? (
+        <div className="space-y-3 rounded-md border p-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Provider">
+              <Select
+                value={llm.provider ?? "anthropic"}
+                onValueChange={(p) => patchExecutor({ provider: p })}
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
+                  <SelectItem value="openai">OpenAI (Codex)</SelectItem>
+                  <SelectItem value="gemini">Gemini</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Model">
+              <Input
+                value={llm.model ?? ""}
+                onChange={(e) => patchExecutor({ model: e.target.value || undefined })}
+                placeholder="claude-opus-4-8"
+                className="h-8 font-mono"
+              />
+            </Field>
+          </div>
+          <Field label="System (optional)">
+            <textarea
+              value={llm.system ?? ""}
+              onChange={(e) => patchExecutor({ system: e.target.value || undefined })}
+              rows={2}
+              className="w-full rounded-md border bg-background p-2 text-xs"
+              placeholder="You are a helpful assistant."
+            />
+          </Field>
+          <Field label="Prompt">
+            <textarea
+              value={llm.prompt}
+              onChange={(e) => patchExecutor({ prompt: e.target.value })}
+              rows={5}
+              className="w-full rounded-md border bg-background p-2 text-xs"
+              placeholder="Summarize: ={{ nodes.fetch.output }}"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Effort">
+              <Select
+                value={llm.effort ?? "default"}
+                onValueChange={(v) =>
+                  patchExecutor({ effort: v === "default" ? undefined : (v as "low" | "high") })
+                }
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">default</SelectItem>
+                  <SelectItem value="low">low</SelectItem>
+                  <SelectItem value="medium">medium</SelectItem>
+                  <SelectItem value="high">high</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="API key secret">
+              <Input
+                value={llm.apiKeySecret ?? ""}
+                onChange={(e) => patchExecutor({ apiKeySecret: e.target.value || undefined })}
+                placeholder="ANTHROPIC_API_KEY"
+                className="h-8 font-mono"
+              />
+            </Field>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Prompt/system support <code>={"{{ }}"}</code> expressions. Set an{" "}
+            <code>outputSchema</code> via YAML import to force structured JSON into the node output.
+          </p>
+        </div>
+      ) : node.executor.type === "script" ? (
         <div className="space-y-3 rounded-md border p-3">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Language">

@@ -142,19 +142,38 @@ export async function evaluateExpression(
   return jsonata(expr).evaluate(context)
 }
 
+/** Context shared by the `={{ }}` resolvers. */
+export interface ExprContext {
+  runDate: Date
+  params?: Record<string, string>
+  nodes?: Record<string, unknown>
+  secrets?: Record<string, string>
+  item?: unknown
+}
+
+function stringify(out: unknown): string {
+  return out == null ? "" : typeof out === "object" ? JSON.stringify(out) : String(out)
+}
+
 /** Resolve a single value: if it is `={{ expr }}`, evaluate it; else return as-is. */
-export async function resolveValueExpr(
-  value: string,
-  ctx: {
-    runDate: Date
-    params?: Record<string, string>
-    nodes?: Record<string, unknown>
-    secrets?: Record<string, string>
-    item?: unknown
-  },
-): Promise<string> {
+export async function resolveValueExpr(value: string, ctx: ExprContext): Promise<string> {
   const match = /^=\{\{([\s\S]+)\}\}$/.exec(value)
   if (!match) return value
-  const out = await evaluateExpression(match[1].trim(), ctx)
-  return out == null ? "" : typeof out === "object" ? JSON.stringify(out) : String(out)
+  return stringify(await evaluateExpression(match[1].trim(), ctx))
+}
+
+/**
+ * Replace every inline `={{ expr }}` occurrence in a template with its evaluated
+ * value. Unlike resolveValueExpr (whole-value), this interpolates expressions
+ * embedded in surrounding text — used for LLM prompts/system messages.
+ */
+export async function interpolateExpr(template: string, ctx: ExprContext): Promise<string> {
+  const matches = [...template.matchAll(/=\{\{([\s\S]+?)\}\}/g)]
+  if (matches.length === 0) return template
+  let out = template
+  for (const m of matches) {
+    const value = stringify(await evaluateExpression(m[1].trim(), ctx))
+    out = out.replace(m[0], value)
+  }
+  return out
 }

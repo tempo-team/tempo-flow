@@ -6,7 +6,7 @@
  * renders and the execution engine interprets. Stored as JSON in Flow.definition.
  */
 
-export type ExecutorType = "http" | "k8s" | "subflow" | "script"
+export type ExecutorType = "http" | "k8s" | "subflow" | "script" | "llm"
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 
@@ -48,11 +48,35 @@ export interface ScriptExecutorConfig {
   network?: boolean
 }
 
+export type LlmProvider = "anthropic" | "openai" | "gemini"
+
+export interface LlmExecutorConfig {
+  type: "llm"
+  /** Which model provider to call (default "anthropic"). */
+  provider?: LlmProvider
+  /** Model id; defaults to the provider's recommended model when omitted. */
+  model?: string
+  /** System prompt (supports `={{ }}` expressions). */
+  system?: string
+  /** User prompt (supports `={{ }}` expressions). */
+  prompt: string
+  maxTokens?: number
+  effort?: "low" | "medium" | "high"
+  /**
+   * JSON Schema. When set, the model is forced to return matching JSON, which
+   * becomes the node's output (consumable downstream as nodes.<id>.output).
+   */
+  outputSchema?: Record<string, unknown>
+  /** Secret key holding the API key (defaults to the provider's standard name). */
+  apiKeySecret?: string
+}
+
 export type ExecutorConfig =
   | HttpExecutorConfig
   | K8sExecutorConfig
   | SubflowExecutorConfig
   | ScriptExecutorConfig
+  | LlmExecutorConfig
 
 /** Reservation-date parameter: `key` = `expr` formatted with `format`. */
 export interface DateParam {

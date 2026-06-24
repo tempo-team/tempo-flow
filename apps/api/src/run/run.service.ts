@@ -7,11 +7,13 @@ import { ConfigService } from "@nestjs/config"
 import { EventEmitter2 } from "@nestjs/event-emitter"
 import { Prisma } from "@prisma/client"
 import {
+  AnthropicClient,
   DefaultK8sJobRunner,
   DockerScriptRunner,
   HttpExecutor,
   type JobExecutor,
   K8sExecutor,
+  LlmExecutor,
   ScriptExecutor,
 } from "@tempo-flow/executors"
 import {
@@ -60,6 +62,8 @@ export class RunService implements NodeRunRecorder {
       script: new ScriptExecutor(
         new DockerScriptRunner(this.config.get<string>("DOCKER_PATH") ?? "docker"),
       ),
+      // LLM nodes call Claude/OpenAI/Gemini; API keys come from the secret store.
+      llm: new LlmExecutor({ anthropic: new AnthropicClient() }),
     }
     // Base URL handed to callback-mode jobs so they can report completion.
     const callbackBaseUrl = this.config.get<string>("PUBLIC_URL") ?? "http://localhost:3000"

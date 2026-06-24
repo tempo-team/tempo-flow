@@ -33,11 +33,24 @@ const scriptExecutorSchema = z.object({
   network: z.boolean().optional(),
 })
 
+const llmExecutorSchema = z.object({
+  type: z.literal("llm"),
+  provider: z.enum(["anthropic", "openai", "gemini"]).optional(),
+  model: z.string().min(1).optional(),
+  system: z.string().optional(),
+  prompt: z.string().min(1),
+  maxTokens: z.number().int().positive().optional(),
+  effort: z.enum(["low", "medium", "high"]).optional(),
+  outputSchema: z.record(z.string(), z.unknown()).optional(),
+  apiKeySecret: z.string().min(1).optional(),
+})
+
 const executorSchema = z.discriminatedUnion("type", [
   httpExecutorSchema,
   k8sExecutorSchema,
   subflowExecutorSchema,
   scriptExecutorSchema,
+  llmExecutorSchema,
 ])
 
 const dateParamSchema = z.object({
