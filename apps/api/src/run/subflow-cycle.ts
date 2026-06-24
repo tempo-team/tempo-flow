@@ -32,3 +32,53 @@ export async function findFlowCycle(
   }
   return null
 }
+
+/** Run-level guardrails enforced before launching a sub-flow / agent-tool child. */
+export interface LaunchGuardrails {
+  maxSubflowDepth?: number
+  allowedToolFlows?: string[]
+}
+
+/**
+ * Enforce launch-time guardrails before starting a child flow run. Returns an
+ * error message to fail the launch, or null when allowed. Shared by the sub-flow
+ * executor and the agent-tool driver so both paths are governed identically.
+ */
+export async function checkLaunchGuardrails(
+  prisma: PrismaService,
+  flowRunId: string,
+  childFlowId: string,
+  guardrails: LaunchGuardrails | undefined,
+): Promise<string | null> {
+  if (!guardrails) return null
+  if (guardrails.allowedToolFlows && !guardrails.allowedToolFlows.includes(childFlowId)) {
+    return `guardrail: flow "${childFlowId}" is not in allowedToolFlows`
+  }
+  if (guardrails.maxSubflowDepth !== undefined) {
+    const depth = await flowChainDepth(prisma, flowRunId)
+    if (depth >= guardrails.maxSubflowDepth) {
+      return `guardrail: max sub-flow depth ${guardrails.maxSubflowDepth} reached`
+    }
+  }
+  return null
+}
+
+/**
+ * Count how many sub-flow levels deep `flowRunId` already is (root run = 0). Used
+ * by the maxSubflowDepth guardrail: a launch is allowed only while depth < max.
+ * Bounded so a pathological chain can't hang the walk.
+ */
+export async function flowChainDepth(prisma: PrismaService, flowRunId: string): Promise<number> {
+  let depth = 0
+  let cursor: string | null = flowRunId
+  for (let i = 0; cursor && i < 100; i++) {
+    const run: { parentRunId: string | null } | null = await prisma.flowRun.findUnique({
+      where: { id: cursor },
+      select: { parentRunId: true },
+    })
+    if (!run?.parentRunId) break
+    depth++
+    cursor = run.parentRunId
+  }
+  return depth
+}

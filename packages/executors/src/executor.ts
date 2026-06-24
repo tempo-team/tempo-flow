@@ -36,6 +36,11 @@ export interface RunContext {
   secrets?: Record<string, string>
   /** W3C trace context to hand to the job so its spans join this trace. */
   traceparent?: string
+  /** Run-level guardrails the sub-flow / agent-tool launchers enforce before launching. */
+  guardrails?: {
+    maxSubflowDepth?: number
+    allowedToolFlows?: string[]
+  }
 }
 
 /** Result of executing one node. */

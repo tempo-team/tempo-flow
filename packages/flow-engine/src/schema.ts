@@ -101,9 +101,16 @@ export const flowEdgeSchema = z.object({
   on: z.enum(["success", "failure", "always"]),
 })
 
+const flowGuardrailsSchema = z.object({
+  maxNodeRuns: z.number().int().positive().optional(),
+  maxSubflowDepth: z.number().int().positive().optional(),
+  allowedToolFlows: z.array(z.string().min(1)).optional(),
+})
+
 export const flowDefinitionSchema = z.object({
   nodes: z.array(flowNodeSchema),
   edges: z.array(flowEdgeSchema),
+  guardrails: flowGuardrailsSchema.optional(),
 })
 
 export const flowTriggerSchema = z.object({

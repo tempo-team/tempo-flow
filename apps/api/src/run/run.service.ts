@@ -232,7 +232,9 @@ export class RunService implements NodeRunRecorder {
       this.logger.log(`Run ${flowRunId} no longer RUNNING; result ${result.status} discarded`)
       return run.status as RunStatus
     }
-    this.logger.log(`Run ${flowRunId} finished: ${result.status}`)
+    this.logger.log(
+      `Run ${flowRunId} finished: ${result.status}${result.reason ? ` (${result.reason})` : ""}`,
+    )
 
     await this.runEvents.publish({
       kind: "run.status",

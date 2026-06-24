@@ -90,6 +90,8 @@ export interface AdvanceResult {
   waiting: boolean
   /** Meaningful only when `waiting` is false. */
   status: RunStatus
+  /** Set when the run was failed by a guardrail (surfaced in logs). */
+  reason?: string
 }
 
 export interface EngineOptions {
@@ -211,17 +213,28 @@ export class ExecutionEngine {
   async advance(args: AdvanceArgs): Promise<AdvanceResult> {
     const { definition, recorder } = args
 
+    const maxNodeRuns = definition.guardrails?.maxNodeRuns
+
     // Drive the frontier forward until nothing new is ready. Each iteration
     // re-reads DB so callbacks that landed mid-advance are picked up.
     for (;;) {
       const states = await recorder.loadNodeStates(args.flowRunId)
+      // Guardrail: cap total node executions to stop runaway loops / fan-out blowups.
+      if (maxNodeRuns && states.length >= maxNodeRuns) {
+        return {
+          waiting: false,
+          status: RunStatus.Failed,
+          reason: `guardrail: exceeded maxNodeRuns (${maxNodeRuns})`,
+        }
+      }
       const ready = this.computeReady(definition, states)
       if (ready.length === 0) break
       const nodeOutputs = buildNodeOutputs(
         definition,
         await recorder.loadNodeOutputs(args.flowRunId),
       )
-      for (const nodeId of ready) await this.runNode(nodeId, args, nodeOutputs)
+      const budgetLeft = maxNodeRuns ? maxNodeRuns - states.length : Number.POSITIVE_INFINITY
+      for (const nodeId of ready) await this.runNode(nodeId, args, nodeOutputs, budgetLeft)
     }
 
     const states = await recorder.loadNodeStates(args.flowRunId)
@@ -269,6 +282,7 @@ export class ExecutionEngine {
     nodeId: string,
     args: AdvanceArgs,
     nodeOutputs: Record<string, unknown>,
+    budgetLeft = Number.POSITIVE_INFINITY,
   ): Promise<void> {
     const node = getNode(args.definition, nodeId)
     if (!node) return
@@ -305,6 +319,17 @@ export class ExecutionEngine {
     if (arr.length === 0) {
       // Vacuous success — mark the node done so successors can fire.
       await this.recordSentinel(node, args, RunStatus.Success, undefined, [])
+      return
+    }
+    // Guardrail: a single fan-out that would blow the run budget fails up front
+    // (rather than spawning thousands of instances and tripping the cap mid-batch).
+    if (arr.length > budgetLeft) {
+      await this.recordSentinel(
+        node,
+        args,
+        RunStatus.Failed,
+        `guardrail: fan-out of ${arr.length} exceeds remaining run budget (${budgetLeft})`,
+      )
       return
     }
 
@@ -374,6 +399,12 @@ export class ExecutionEngine {
         traceparent: carrier.traceparent,
         onLog: (line) => recorder.nodeLog?.(args.flowRunId, node.id, line),
         callback,
+        guardrails: args.definition.guardrails
+          ? {
+              maxSubflowDepth: args.definition.guardrails.maxSubflowDepth,
+              allowedToolFlows: args.definition.guardrails.allowedToolFlows,
+            }
+          : undefined,
       }
       const { result, attempt } = await this.executeWithRetry(node, ctx)
       // Never persist plaintext: mask secret values AND the one-time callback

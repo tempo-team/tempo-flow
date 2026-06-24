@@ -372,4 +372,59 @@ describe("ExecutionEngine.advance", () => {
     await Promise.all([engine.advance(args(rec, def)), engine.advance(args(rec, def))])
     expect(calls.a).toBe(1)
   })
+
+  // --- guardrails --------------------------------------------------------
+
+  it("fails the run when maxNodeRuns is exceeded", async () => {
+    const def: FlowDefinition = {
+      nodes: [node("a"), node("b"), node("c")],
+      edges: [
+        { id: "e1", source: "a", target: "b", on: "success" },
+        { id: "e2", source: "b", target: "c", on: "success" },
+      ],
+      guardrails: { maxNodeRuns: 2 },
+    }
+    const { rec, rows } = recorder()
+    const engine = new ExecutionEngine({ http: executor({}) }, { sleep: async () => {} })
+    const result = await engine.advance(args(rec, def))
+    expect(result.status).toBe(RunStatus.Failed)
+    expect(result.reason).toMatch(/maxNodeRuns/)
+    expect(rows.has("c:0")).toBe(false) // the third node never ran
+  })
+
+  it("fails a fan-out that would exceed the run budget up front", async () => {
+    const def: FlowDefinition = {
+      nodes: [node("map", { forEach: "[1, 2, 3, 4, 5]" })],
+      edges: [],
+      guardrails: { maxNodeRuns: 3 },
+    }
+    const { rec, rows } = recorder()
+    const calls: Record<string, number> = {}
+    const engine = new ExecutionEngine({ http: executor(calls) }, { sleep: async () => {} })
+    const result = await engine.advance(args(rec, def))
+    expect(result.status).toBe(RunStatus.Failed)
+    // sentinel claimed at mapIndex 0 as FAILED; no per-item instances ran
+    expect(rows.get("map:0")?.status).toBe(RunStatus.Failed)
+    expect(calls.map ?? 0).toBe(0)
+  })
+
+  it("passes run-level guardrails into the node context", async () => {
+    const def: FlowDefinition = {
+      nodes: [node("a")],
+      edges: [],
+      guardrails: { maxSubflowDepth: 3, allowedToolFlows: ["flow-x"] },
+    }
+    const { rec } = recorder()
+    let seen: { maxSubflowDepth?: number; allowedToolFlows?: string[] } | undefined
+    const exec: JobExecutor = {
+      type: "http",
+      async execute(_n, ctx): Promise<ExecResult> {
+        seen = ctx.guardrails
+        return { ok: true }
+      },
+    }
+    const engine = new ExecutionEngine({ http: exec }, { sleep: async () => {} })
+    await engine.advance(args(rec, def))
+    expect(seen).toEqual({ maxSubflowDepth: 3, allowedToolFlows: ["flow-x"] })
+  })
 })

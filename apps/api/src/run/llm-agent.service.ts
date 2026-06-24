@@ -31,7 +31,7 @@ import { QueueService } from "../queue/queue.service"
 import { SecretService } from "../secret/secret.service"
 import { loadChildOutputs, toParams } from "./agent-tool-helpers"
 import { RunLauncherService } from "./run-launcher.service"
-import { findFlowCycle } from "./subflow-cycle"
+import { type LaunchGuardrails, checkLaunchGuardrails, findFlowCycle } from "./subflow-cycle"
 
 const DEFAULT_KEY_SECRET: Record<LlmProvider, string> = {
   anthropic: "ANTHROPIC_API_KEY",
@@ -64,6 +64,7 @@ interface TurnCtx {
   system?: string
   apiKey: string
   cfg: LlmExecutorConfig
+  guardrails?: LaunchGuardrails
   onLog: (line: string) => void
 }
 
@@ -125,6 +126,7 @@ export class LlmAgentService {
       system,
       apiKey,
       cfg,
+      guardrails: ctx.guardrails,
       onLog: (l) => ctx.onLog?.(l),
     }
     const request = { provider: tctx.provider, model, tools: cfg.tools?.length ?? 0 }
@@ -266,6 +268,16 @@ export class LlmAgentService {
       const cycle = await findFlowCycle(this.prisma, tctx.flowRunId, tool.flowId)
       if (cycle) {
         pending.push({ toolUseId: use.id, toolName: use.name, error: `cycle: ${cycle}` })
+        continue
+      }
+      const breach = await checkLaunchGuardrails(
+        this.prisma,
+        tctx.flowRunId,
+        tool.flowId,
+        tctx.guardrails,
+      )
+      if (breach) {
+        pending.push({ toolUseId: use.id, toolName: use.name, error: breach })
         continue
       }
       const child = await this.launcher.launch({
@@ -463,6 +475,7 @@ export class LlmAgentService {
       system: state.system ?? undefined,
       apiKey,
       cfg,
+      guardrails: def.guardrails,
       onLog: (l) =>
         this.runEvents.publish({
           kind: "node.log",

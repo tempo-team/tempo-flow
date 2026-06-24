@@ -9,7 +9,7 @@ import {
   isTerminal,
 } from "@tempo-flow/shared-types"
 import type { PrismaService } from "../prisma/prisma.service"
-import { findFlowCycle } from "./subflow-cycle"
+import { checkLaunchGuardrails, findFlowCycle } from "./subflow-cycle"
 import type { RunLauncherService } from "./run-launcher.service"
 
 const POLL_INTERVAL_MS = 1000
@@ -43,6 +43,14 @@ export class SubflowExecutor implements JobExecutor {
     if (cycle) {
       return { ok: false, errorMessage: `Sub-flow cycle detected: ${cycle}` }
     }
+
+    const breach = await checkLaunchGuardrails(
+      this.prisma,
+      ctx.flowRunId,
+      childFlowId,
+      ctx.guardrails,
+    )
+    if (breach) return { ok: false, errorMessage: breach }
 
     const child = await this.launcher.launch({
       flowId: childFlowId,

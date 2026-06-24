@@ -15,10 +15,11 @@ const node = (flowId: string): FlowNode => ({
   timeoutMs: 5000,
 })
 
-const ctx = (flowRunId: string): RunContext => ({
+const ctx = (flowRunId: string, guardrails?: RunContext["guardrails"]): RunContext => ({
   flowRunId,
   nodeId: "n1",
   runDate: new Date("2026-06-22T00:00:00Z"),
+  guardrails,
 })
 
 function build(opts: {
@@ -90,5 +91,32 @@ describe("SubflowExecutor", () => {
     const result = await exec.execute(node("flow-B"), ctx("run-A"))
     expect(result.ok).toBe(false)
     expect(result.errorMessage).toContain("FAILED")
+  })
+
+  it("rejects a launch for a flow not in allowedToolFlows", async () => {
+    const { exec, launch } = build({
+      runs: { "run-A": { flowId: "flow-A", parentRunId: null } },
+    })
+    const result = await exec.execute(
+      node("flow-B"),
+      ctx("run-A", { allowedToolFlows: ["flow-C"] }),
+    )
+    expect(result.ok).toBe(false)
+    expect(result.errorMessage).toMatch(/allowedToolFlows/)
+    expect(launch).not.toHaveBeenCalled()
+  })
+
+  it("rejects a launch past maxSubflowDepth", async () => {
+    // run-B (flow-B) is already one level deep (parent run-A) → depth 1.
+    const { exec, launch } = build({
+      runs: {
+        "run-B": { flowId: "flow-B", parentRunId: "run-A" },
+        "run-A": { flowId: "flow-A", parentRunId: null },
+      },
+    })
+    const result = await exec.execute(node("flow-C"), ctx("run-B", { maxSubflowDepth: 1 }))
+    expect(result.ok).toBe(false)
+    expect(result.errorMessage).toMatch(/depth/)
+    expect(launch).not.toHaveBeenCalled()
   })
 })

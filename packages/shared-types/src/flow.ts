@@ -163,9 +163,24 @@ export interface FlowEdge {
   on: EdgeCondition
 }
 
+/**
+ * Run-level safety limits ("guardrails"). All optional; enforced by the engine
+ * and the sub-flow / agent-tool launchers. Stored in the flow definition (no DB
+ * migration). Complements per-node limits (retry, timeoutMs, maxToolTurns).
+ */
+export interface FlowGuardrails {
+  /** Max total node executions per run — caps runaway loops and fan-out explosions. */
+  maxNodeRuns?: number
+  /** Max sub-flow nesting depth (parentRunId chain) for sub-flow & agent-tool launches. */
+  maxSubflowDepth?: number
+  /** Allow-list of flowIds that may be launched as sub-flows / agent tools. */
+  allowedToolFlows?: string[]
+}
+
 export interface FlowDefinition {
   nodes: FlowNode[]
   edges: FlowEdge[]
+  guardrails?: FlowGuardrails
 }
 
 export type FlowTriggerType = "cron" | "manual"
