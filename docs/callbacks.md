@@ -18,11 +18,12 @@ The same content is available in-app under the **Integration** menu.
 tempo-flow injects a one-time callback URL (the token is already in the URL) into
 the triggered job. You just `POST` your result to it.
 
-| Executor       | How the coordinates arrive                                                                                         |
-| -------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **HTTP**       | headers `x-tempo-callback-url` / `x-tempo-callback-token` (body mode: `_tempoCallbackUrl` / `_tempoCallbackToken`) |
-| **Script**     | env `TEMPO_CALLBACK_URL` / `TEMPO_CALLBACK_TOKEN`                                                                  |
-| **Kubernetes** | env `TEMPO_CALLBACK_URL` / `TEMPO_CALLBACK_TOKEN`                                                                  |
+| Executor         | How the coordinates arrive                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **HTTP**         | headers `x-tempo-callback-url` / `x-tempo-callback-token` (body mode: `_tempoCallbackUrl` / `_tempoCallbackToken`) |
+| **Script**       | env `TEMPO_CALLBACK_URL` / `TEMPO_CALLBACK_TOKEN`                                                                  |
+| **Kubernetes**   | env `TEMPO_CALLBACK_URL` / `TEMPO_CALLBACK_TOKEN`                                                                  |
+| **Spring Batch** | env `TEMPO_CALLBACK_URL` / `TEMPO_CALLBACK_TOKEN`                                                                  |
 
 ## The contract
 

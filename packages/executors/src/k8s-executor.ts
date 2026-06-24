@@ -33,6 +33,65 @@ export function k8sName(...parts: string[]): string {
   return base || "job"
 }
 
+/** A single container spec for a one-shot Job (executor-neutral). */
+export interface JobContainer {
+  image: string
+  command?: string[]
+  args?: string[]
+  env?: { name: string; value: string }[]
+}
+
+/**
+ * Build a one-shot Kubernetes Job manifest from a container spec. Shared by the
+ * k8s and spring-batch executors so the Job skeleton (backoffLimit 0,
+ * restartPolicy Never, managed-by label) lives in exactly one place.
+ */
+export function buildJobFromContainer(
+  container: JobContainer,
+  opts: { jobName: string; namespace: string },
+): V1Job {
+  return {
+    apiVersion: "batch/v1",
+    kind: "Job",
+    metadata: { name: opts.jobName, namespace: opts.namespace },
+    spec: {
+      backoffLimit: 0,
+      template: {
+        metadata: { labels: { "app.kubernetes.io/managed-by": "tempo-flow" } },
+        spec: {
+          restartPolicy: "Never",
+          containers: [
+            {
+              name: "task",
+              image: container.image,
+              ...(container.command ? { command: container.command } : {}),
+              ...(container.args && container.args.length > 0 ? { args: container.args } : {}),
+              ...(container.env && container.env.length > 0 ? { env: container.env } : {}),
+            },
+          ],
+        },
+      },
+    },
+  }
+}
+
+/**
+ * Completion-callback coordinates as env vars (independent of how params are
+ * passed) so a callback-mode Job can report its result back. Shared by Job-based
+ * executors.
+ */
+export function callbackEnv(callback?: {
+  url: string
+  token: string
+}): { name: string; value: string }[] {
+  return callback
+    ? [
+        { name: "TEMPO_CALLBACK_URL", value: callback.url },
+        { name: "TEMPO_CALLBACK_TOKEN", value: callback.token },
+      ]
+    : []
+}
+
 /**
  * Build a Kubernetes Job manifest for a node. Resolved params are injected as
  * env vars (default) or appended to args as `--key=value`.
@@ -47,42 +106,15 @@ export function buildJobManifest(
 
   const envVars =
     paramsAs === "env" ? Object.entries(params).map(([name, value]) => ({ name, value })) : []
-  // Completion-callback coordinates are always injected as env (independent of how
-  // params are passed) so a callback-mode Job can report its result back.
-  if (opts.callback) {
-    envVars.push(
-      { name: "TEMPO_CALLBACK_URL", value: opts.callback.url },
-      { name: "TEMPO_CALLBACK_TOKEN", value: opts.callback.token },
-    )
-  }
-  const env = envVars.length > 0 ? envVars : undefined
+  envVars.push(...callbackEnv(opts.callback))
 
   const extraArgs = paramsAs === "args" ? Object.entries(params).map(([k, v]) => `--${k}=${v}`) : []
   const args = [...(cfg.args ?? []), ...extraArgs]
 
-  return {
-    apiVersion: "batch/v1",
-    kind: "Job",
-    metadata: { name: opts.jobName, namespace: cfg.namespace ?? DEFAULT_NAMESPACE },
-    spec: {
-      backoffLimit: 0,
-      template: {
-        metadata: { labels: { "app.kubernetes.io/managed-by": "tempo-flow" } },
-        spec: {
-          restartPolicy: "Never",
-          containers: [
-            {
-              name: "task",
-              image: cfg.image,
-              ...(cfg.command ? { command: cfg.command } : {}),
-              ...(args.length > 0 ? { args } : {}),
-              ...(env ? { env } : {}),
-            },
-          ],
-        },
-      },
-    },
-  }
+  return buildJobFromContainer(
+    { image: cfg.image, command: cfg.command, args, env: envVars },
+    { jobName: opts.jobName, namespace: cfg.namespace ?? DEFAULT_NAMESPACE },
+  )
 }
 
 /**

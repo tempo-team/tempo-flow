@@ -3,7 +3,7 @@
 
 import { type Node, type NodeProps, Position } from "@xyflow/react"
 import { Handle } from "@xyflow/react"
-import { Box, Globe, Sparkles, Terminal, Workflow } from "lucide-react"
+import { Box, Globe, Layers, Sparkles, Terminal, Workflow } from "lucide-react"
 import type { FlowNodeData } from "@/lib/flow-graph"
 import { isActiveStatus, statusVar } from "@/lib/status"
 import { cn } from "@/lib/utils"
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 const EXECUTOR_ICON: Record<string, typeof Workflow> = {
   http: Globe,
   k8s: Box,
+  "spring-batch": Layers,
   subflow: Workflow,
   script: Terminal,
   llm: Sparkles,

@@ -78,6 +78,10 @@ export function defaultSubflowExecutor(): ExecutorConfig {
   return { type: "subflow", flowId: "" }
 }
 
+export function defaultSpringBatchExecutor(): ExecutorConfig {
+  return { type: "spring-batch", image: "ghcr.io/acme/batch-app:1.0" }
+}
+
 export function defaultScriptExecutor(): ExecutorConfig {
   return { type: "script", language: "python", code: "print('hello from tempo-flow')\n" }
 }

@@ -10,6 +10,7 @@ import type {
   K8sExecutorConfig,
   LlmExecutorConfig,
   ScriptExecutorConfig,
+  SpringBatchExecutorConfig,
   SubflowExecutorConfig,
 } from "@tempo-flow/shared-types"
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,7 @@ import {
   defaultK8sExecutor,
   defaultLlmExecutor,
   defaultScriptExecutor,
+  defaultSpringBatchExecutor,
   defaultSubflowExecutor,
 } from "./state"
 import { KeyValueEditor } from "./KeyValueEditor"
@@ -43,6 +45,7 @@ export function NodeForm({ node, onChange }: Props) {
   const subflow = node.executor as SubflowExecutorConfig
   const script = node.executor as ScriptExecutorConfig
   const llm = node.executor as LlmExecutorConfig
+  const springBatch = node.executor as SpringBatchExecutorConfig
 
   function patch(p: Partial<FlowNode>): void {
     onChange({ ...node, ...p })
@@ -89,7 +92,9 @@ export function NodeForm({ node, onChange }: Props) {
                       ? defaultScriptExecutor()
                       : t === "llm"
                         ? defaultLlmExecutor()
-                        : defaultSubflowExecutor(),
+                        : t === "spring-batch"
+                          ? defaultSpringBatchExecutor()
+                          : defaultSubflowExecutor(),
             })
           }
         >
@@ -99,6 +104,7 @@ export function NodeForm({ node, onChange }: Props) {
           <SelectContent>
             <SelectItem value="http">HTTP</SelectItem>
             <SelectItem value="k8s">Kubernetes Job</SelectItem>
+            <SelectItem value="spring-batch">Spring Batch</SelectItem>
             <SelectItem value="script">Script</SelectItem>
             <SelectItem value="llm">LLM</SelectItem>
             <SelectItem value="subflow">Sub-flow</SelectItem>
@@ -361,6 +367,66 @@ export function NodeForm({ node, onChange }: Props) {
             value={http.headers ?? {}}
             onChange={(headers) => patchExecutor({ headers })}
           />
+        </div>
+      ) : node.executor.type === "spring-batch" ? (
+        <div className="space-y-3 rounded-md border p-3">
+          <Field label="Image">
+            <Input
+              value={springBatch.image}
+              onChange={(e) => patchExecutor({ image: e.target.value })}
+              placeholder="ghcr.io/acme/batch-app:1.0"
+              className="h-8"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Job name (spring.batch.job.name)">
+              <Input
+                value={springBatch.jobName ?? ""}
+                onChange={(e) => patchExecutor({ jobName: e.target.value || undefined })}
+                placeholder="importUserJob"
+                className="h-8"
+              />
+            </Field>
+            <Field label="Namespace">
+              <Input
+                value={springBatch.namespace ?? ""}
+                onChange={(e) => patchExecutor({ namespace: e.target.value || undefined })}
+                placeholder="default"
+                className="h-8"
+              />
+            </Field>
+          </div>
+          <Field label="Profiles (comma-separated)">
+            <Input
+              value={(springBatch.profiles ?? []).join(",")}
+              onChange={(e) =>
+                patchExecutor({
+                  profiles: e.target.value
+                    ? e.target.value
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter(Boolean)
+                    : undefined,
+                })
+              }
+              placeholder="prod,batch"
+              className="h-8"
+            />
+          </Field>
+          <Field label="Command (space-separated)">
+            <Input
+              value={(springBatch.command ?? []).join(" ")}
+              onChange={(e) =>
+                patchExecutor({ command: e.target.value ? e.target.value.split(" ") : undefined })
+              }
+              placeholder="java -jar app.jar"
+              className="h-8"
+            />
+          </Field>
+          <p className="text-xs text-muted-foreground">
+            Runs a Spring Boot batch app as a K8s Job. Static params become Spring Batch
+            JobParameters (passed as <code>key=value</code> program args).
+          </p>
         </div>
       ) : (
         <div className="space-y-3 rounded-md border p-3">

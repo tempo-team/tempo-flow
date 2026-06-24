@@ -6,7 +6,7 @@
  * renders and the execution engine interprets. Stored as JSON in Flow.definition.
  */
 
-export type ExecutorType = "http" | "k8s" | "subflow" | "script" | "llm"
+export type ExecutorType = "http" | "k8s" | "subflow" | "script" | "llm" | "spring-batch"
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 
@@ -88,12 +88,33 @@ export interface LlmExecutorConfig {
   maxToolTurns?: number
 }
 
+/**
+ * Spring Batch on Kubernetes. Runs a containerized Spring Boot batch app as a
+ * one-shot K8s Job (sharing the k8s executor's cluster plumbing). Node params
+ * become Spring Batch JobParameters (passed as non-option `key=value` program
+ * args); Spring config is injected as env vars so it can't collide with them.
+ */
+export interface SpringBatchExecutorConfig {
+  type: "spring-batch"
+  /** Spring Boot batch app container image. */
+  image: string
+  /** Job bean to run → SPRING_BATCH_JOB_NAME (needed when the app has many Jobs). */
+  jobName?: string
+  /** Active profiles → SPRING_PROFILES_ACTIVE (comma-joined). */
+  profiles?: string[]
+  /** Namespace the Job is created in (default "default"). */
+  namespace?: string
+  /** Override the container ENTRYPOINT (default: the image's own java -jar entrypoint). */
+  command?: string[]
+}
+
 export type ExecutorConfig =
   | HttpExecutorConfig
   | K8sExecutorConfig
   | SubflowExecutorConfig
   | ScriptExecutorConfig
   | LlmExecutorConfig
+  | SpringBatchExecutorConfig
 
 /** Reservation-date parameter: `key` = `expr` formatted with `format`. */
 export interface DateParam {

@@ -14,6 +14,7 @@ import {
   K8sExecutor,
   LlmExecutor,
   ScriptExecutor,
+  SpringBatchExecutor,
 } from "@tempo-flow/executors"
 import {
   type CompletionMode,
@@ -55,9 +56,12 @@ export class RunService implements NodeRunRecorder {
   ) {
     // K8s runner lazily loads kube config on first use, so constructing it here
     // does not require a cluster to be reachable at boot.
+    // Shared by the k8s and spring-batch executors (same cluster plumbing).
+    const k8sRunner = new DefaultK8sJobRunner()
     const executors: Record<string, JobExecutor> = {
       http: new HttpExecutor(),
-      k8s: new K8sExecutor(new DefaultK8sJobRunner()),
+      k8s: new K8sExecutor(k8sRunner),
+      "spring-batch": new SpringBatchExecutor(k8sRunner),
       subflow: new SubflowExecutor(this.launcher, this.prisma),
       // Inline scripts run as isolated one-shot Docker containers (DooD).
       script: new ScriptExecutor(

@@ -186,6 +186,10 @@ export function IntegrationPage() {
             <span className="text-muted-foreground">
               env <Mono>TEMPO_CALLBACK_URL</Mono> / <Mono>TEMPO_CALLBACK_TOKEN</Mono>
             </span>
+            <span className="font-medium">Spring Batch</span>
+            <span className="text-muted-foreground">
+              env <Mono>TEMPO_CALLBACK_URL</Mono> / <Mono>TEMPO_CALLBACK_TOKEN</Mono>
+            </span>
           </div>
         </CardContent>
       </Card>

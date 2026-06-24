@@ -6,14 +6,15 @@
 
 > Self-hosted, 100% TypeScript workflow orchestration for backend teams — a
 > **durable** execution engine, second-level cron, visual DAGs, and pluggable
-> executors (HTTP, Kubernetes, inline scripts, sub-flows, and **LLMs**). Stand it
-> up with `docker compose up`.
+> executors (HTTP, Kubernetes, Spring Batch, inline scripts, sub-flows, and
+> **LLMs**). Stand it up with `docker compose up`.
 
 tempo-flow registers batch jobs and workflows, schedules them with **second-level
 cron** (or manual / webhook / event triggers), chains **multiple follow-up steps**
 with success/failure branching, **visualizes the flow** as a DAG, and runs each
-step over **HTTP**, as a **Kubernetes Job**, an **isolated inline script**, a
-**sub-flow**, or an **LLM call** — on a **durable engine** that checkpoints
+step over **HTTP**, as a **Kubernetes Job**, a **Spring Batch job**, an
+**isolated inline script**, a **sub-flow**, or an **LLM call** — on a **durable
+engine** that checkpoints
 progress and resumes across worker restarts.
 
 ## Features
@@ -33,8 +34,13 @@ progress and resumes across worker restarts.
 
 **Executors**
 
-- **HTTP**, **Kubernetes Job (Pod)**, **inline multi-language scripts**
-  (Python / Node / Bash / Go in isolated containers), **sub-flow**, and **LLM**.
+- **HTTP**, **Kubernetes Job (Pod)**, **Spring Batch (on K8s)**, **inline
+  multi-language scripts** (Python / Node / Bash / Go in isolated containers),
+  **sub-flow**, and **LLM**.
+- **Spring Batch executor** — run a containerized Spring Boot batch app as a K8s
+  Job. Node params become Spring Batch JobParameters (passed as `key=value`
+  program args); `jobName` and `profiles` are injected as `SPRING_BATCH_JOB_NAME`
+  / `SPRING_PROFILES_ACTIVE`. Reuses the Kubernetes executor's cluster plumbing.
 
 **AI & agents**
 

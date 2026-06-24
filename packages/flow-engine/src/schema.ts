@@ -54,12 +54,22 @@ const llmExecutorSchema = z.object({
   maxToolTurns: z.number().int().positive().optional(),
 })
 
+const springBatchExecutorSchema = z.object({
+  type: z.literal("spring-batch"),
+  image: z.string().min(1),
+  jobName: z.string().min(1).optional(),
+  profiles: z.array(z.string().min(1)).optional(),
+  namespace: z.string().optional(),
+  command: z.array(z.string()).optional(),
+})
+
 const executorSchema = z.discriminatedUnion("type", [
   httpExecutorSchema,
   k8sExecutorSchema,
   subflowExecutorSchema,
   scriptExecutorSchema,
   llmExecutorSchema,
+  springBatchExecutorSchema,
 ])
 
 const dateParamSchema = z.object({
