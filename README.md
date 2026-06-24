@@ -4,18 +4,55 @@
 
 # tempo-flow
 
-> Self-hosted, 100% TypeScript workflow orchestration for backend teams — a
-> **durable** execution engine, second-level cron, visual DAGs, and pluggable
-> executors (HTTP, Kubernetes, Spring Batch, inline scripts, sub-flows, and
-> **LLMs**). Stand it up with `docker compose up`.
+<p align="center">
+  <a href="https://github.com/tempo-team/tempo-flow/actions/workflows/ci.yml"><img src="https://github.com/tempo-team/tempo-flow/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0" /></a>
+  <img src="https://img.shields.io/badge/TypeScript-100%25-3178c6.svg" alt="100% TypeScript" />
+  <img src="https://img.shields.io/badge/self--host-docker%20compose%20up-2496ed.svg" alt="docker compose up" />
+</p>
+
+> **The durable, 100% TypeScript workflow engine you can `docker compose up`** —
+> second-level cron, visual DAGs, and pluggable executors (HTTP, Kubernetes,
+> Spring Batch, inline scripts, sub-flows, and **LLMs**), on an engine that
+> checkpoints progress and resumes across worker restarts.
+
+What makes it different:
+
+- 🔄 **Durable checkpoint-resume** — a run survives worker restarts; long
+  external jobs report back via async callbacks instead of holding a worker.
+- ⏱️ **Second-level cron** — 6-field schedules (most engines stop at the minute),
+  plus manual / webhook / event triggers and date-range backfill.
+- 🤖 **Durable agentic LLM steps** — the model calls tools that run as sub-flows;
+  the loop suspends while tools run and resumes across restarts — **no re-billed turns**.
+
+<!-- Drop a short screen capture here (draw a DAG → Run → nodes light up green/red). -->
+<!-- <p align="center"><img src="./docs/assets/demo.gif" alt="tempo-flow demo" width="760" /></p> -->
 
 tempo-flow registers batch jobs and workflows, schedules them with **second-level
 cron** (or manual / webhook / event triggers), chains **multiple follow-up steps**
 with success/failure branching, **visualizes the flow** as a DAG, and runs each
 step over **HTTP**, as a **Kubernetes Job**, a **Spring Batch job**, an
 **isolated inline script**, a **sub-flow**, or an **LLM call** — on a **durable
-engine** that checkpoints
-progress and resumes across worker restarts.
+engine** that checkpoints progress and resumes across worker restarts.
+
+## How it compares
+
+A rough map of where tempo-flow sits (best-effort as of 2026 — corrections welcome via PR):
+
+|                                  |     tempo-flow      | Temporal  |       n8n       |    Windmill    |  Airflow   |
+| -------------------------------- | :-----------------: | :-------: | :-------------: | :------------: | :--------: |
+| End-to-end language              |     TypeScript      | Go + SDKs |    TS / Node    | Rust + scripts |   Python   |
+| Durable checkpoint-resume        |         ✅          |    ✅     |        —        |    partial     | retry-only |
+| Second-level cron                |         ✅          |    ✅     |     minute      |     minute     |   minute   |
+| Visual DAG editor                |         ✅          |     —     |       ✅        |       ✅       | view-only  |
+| K8s Job / Spring Batch executor  |         ✅          | via code  |        —        |       —        | operators  |
+| LLM step + durable agentic tools |         ✅          |     —     |      basic      |     basic      |     —      |
+| One-command self-host            | `docker compose up` |  heavier  |       ✅        |       ✅       |  heavier   |
+| License                          |     Apache-2.0      |    MIT    | Sustainable-use |    AGPL/EE     | Apache-2.0 |
+
+**Pick tempo-flow when** you want Temporal-style durability _and_ an n8n-style
+visual DAG _and_ first-class LLM/agent steps — all in one TypeScript codebase you
+self-host in one command.
 
 ## Features
 

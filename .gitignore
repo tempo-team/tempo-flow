@@ -22,3 +22,4 @@ prisma/*.db-journal
 thoughts/
 .claude/
 .gstack/
+docs/launch/
