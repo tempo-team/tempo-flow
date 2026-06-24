@@ -4,25 +4,57 @@
 
 # tempo-flow
 
-> Self-hosted batch management for backend teams — flow visualization, second-level cron,
-> multi follow-up chaining, and HTTP / Kubernetes executors. 100% TypeScript.
+> Self-hosted, 100% TypeScript workflow orchestration for backend teams — a
+> **durable** execution engine, second-level cron, visual DAGs, and pluggable
+> executors (HTTP, Kubernetes, inline scripts, sub-flows, and **LLMs**). Stand it
+> up with `docker compose up`.
 
-tempo-flow lets you register batch jobs, schedule them with **second-level cron**, chain
-**multiple follow-up steps** with success/failure branching, **visualize the flow** as a DAG,
-and run each step over **HTTP** or as a **Kubernetes Job (Pod)** — all from a single
-self-hosted app you can stand up with `docker compose up`.
+tempo-flow registers batch jobs and workflows, schedules them with **second-level
+cron** (or manual / webhook / event triggers), chains **multiple follow-up steps**
+with success/failure branching, **visualizes the flow** as a DAG, and runs each
+step over **HTTP**, as a **Kubernetes Job**, an **isolated inline script**, a
+**sub-flow**, or an **LLM call** — on a **durable engine** that checkpoints
+progress and resumes across worker restarts.
 
-## Why tempo-flow
+## Features
 
-- **TypeScript end to end** — api (NestJS) + web (React) in one monorepo.
-- **Second-level cron** — schedule down to the second (6-field cron via Croner).
-- **Visual flows** — see and edit batch DAGs in the browser (React Flow).
-- **Multi follow-up + conditional branching** — fan out on success/failure.
-- **Pluggable executors** — call an HTTP endpoint or spawn a Kubernetes Job.
-- **Bring your own DB** — Prisma supports PostgreSQL / MySQL / SQLite with migrations.
-- **Distributed & safe** — BullMQ + Redis with distributed locks (no duplicate runs).
-- **Notifications** — Slack and Telegram out of the box.
-- **RBAC** — admin / operator / viewer roles.
+**Orchestration & reliability**
+
+- **Durable checkpoint-resume engine** — a run survives worker restarts; long
+  external jobs report back via async completion callbacks instead of holding a worker.
+- **Second-level cron** (6-field via Croner) plus manual, webhook, and event
+  triggers, and date-range backfill.
+- **Multi follow-up + conditional branching** — fan out on success / failure / always.
+- **Dynamic fan-out** (`forEach`) with all / any / ratio join policies.
+- **Sub-flows** — run a whole flow as a single node.
+- **Run-level guardrails** — node-run budget, sub-flow depth, and tool allow-lists.
+- **Distributed & safe** — BullMQ + Redis with claim-based concurrency (no duplicate runs).
+
+**Executors**
+
+- **HTTP**, **Kubernetes Job (Pod)**, **inline multi-language scripts**
+  (Python / Node / Bash / Go in isolated containers), **sub-flow**, and **LLM**.
+
+**AI & agents**
+
+- **LLM executor** — Claude / OpenAI / Gemini behind one interface; prompt
+  templating over upstream outputs and structured (JSON-schema) outputs.
+- **Durable agentic tool-use** — the model calls tools that run as sub-flows; the
+  loop suspends while tools run and resumes across restarts (no re-billing turns).
+
+**Security & operations**
+
+- **First-class secrets** — AES-256-GCM at rest, injected at run time, masked from records/logs.
+- **Approval gates** — human-in-the-loop before sensitive runs.
+- **RBAC** (admin / operator / viewer) and **OIDC single sign-on**.
+- **OpenTelemetry** tracing — flow/node spans with trace-context propagation.
+- **Notifications** — Slack, Telegram, Discord, Email, and webhooks.
+
+**Platform**
+
+- **100% TypeScript** monorepo — NestJS api + React (React Flow) web, dark-first UI.
+- **Bring your own DB** — Prisma on PostgreSQL / MySQL / SQLite.
+- **One-command self-hosting** — `docker compose up`.
 
 ## Quick start (Docker)
 
@@ -161,11 +193,6 @@ The api/worker entrypoint ([`docker/entrypoint.sh`](./docker/entrypoint.sh)):
 3. optionally seeds (`SEED_ON_START`), then starts the API.
 
 See [docs/configuration.md](./docs/configuration.md) for the full env reference.
-
-## Status
-
-🚧 Early development. See the implementation plan in
-[`thoughts/shared/plans/`](./thoughts/shared/plans/).
 
 ## License
 
