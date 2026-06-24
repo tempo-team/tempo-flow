@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useEffect, useMemo, useState } from "react"
-import { Background, Controls, ReactFlow } from "@xyflow/react"
+import { Background, BackgroundVariant, Controls, MiniMap, ReactFlow } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { ArrowLeft, CalendarRange, Download, Pencil, Play, Trash2 } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -29,6 +29,7 @@ import { RunDetailSheet } from "@/features/runs/RunDetailSheet"
 import { StatusBadge } from "@/features/runs/StatusBadge"
 import { type FlowRunSummary, type FlowSummary, api } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { flowNodeTypes } from "@/features/flow-editor/FlowNode"
 import { toReactFlow } from "@/lib/flow-graph"
 import { useRunStream } from "@/lib/useRunStream"
 
@@ -133,16 +134,20 @@ export function FlowPage() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="h-[560px] rounded-md">
+          <div className="h-[560px] overflow-hidden rounded-xl bg-muted/20">
             <ReactFlow
               nodes={graph.nodes}
               edges={graph.edges}
+              nodeTypes={flowNodeTypes}
               fitView
+              nodesDraggable={false}
+              nodesConnectable={false}
               colorMode={resolvedTheme === "dark" ? "dark" : "light"}
               proOptions={{ hideAttribution: true }}
             >
-              <Background />
-              <Controls showInteractive={false} />
+              <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+              <MiniMap pannable zoomable className="!bg-card" />
+              <Controls showInteractive={false} className="!shadow-sm" />
             </ReactFlow>
           </div>
         </CardContent>

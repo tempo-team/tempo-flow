@@ -4,10 +4,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   Background,
+  BackgroundVariant,
   type Connection,
   Controls,
   type Edge,
   type EdgeChange,
+  MiniMap,
   type Node,
   type NodeChange,
   ReactFlow,
@@ -29,6 +31,7 @@ import {
 } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { type FlowNodeData, layout, toReactFlow } from "@/lib/flow-graph"
+import { flowNodeTypes } from "./FlowNode"
 import { NodeForm } from "./NodeForm"
 import { newEdge, newNode, updateNodeInDef } from "./state"
 
@@ -141,19 +144,22 @@ export function CanvasMode({ definition, onChange }: Props) {
         </p>
       </div>
 
-      <div className="h-[600px] rounded-md border">
+      <div className="h-[600px] overflow-hidden rounded-lg border bg-muted/20">
         <ReactFlow
           nodes={nodes}
           edges={edges}
+          nodeTypes={flowNodeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={(_, node) => setSelectedNode(node.id)}
           colorMode={resolvedTheme === "dark" ? "dark" : "light"}
+          proOptions={{ hideAttribution: true }}
           fitView
         >
-          <Background />
-          <Controls />
+          <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+          <MiniMap pannable zoomable className="!bg-card" />
+          <Controls className="!shadow-sm" />
         </ReactFlow>
       </div>
 

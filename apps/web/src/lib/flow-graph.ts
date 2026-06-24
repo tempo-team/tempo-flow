@@ -8,39 +8,35 @@ import type { EdgeCondition, FlowDefinition } from "@tempo-flow/shared-types"
 export interface FlowNodeData extends Record<string, unknown> {
   label: string
   executor: string
+  /** Run status for the run-status overlay (PENDING/RUNNING/SUCCESS/…); absent in the editor. */
+  status?: string
 }
 
+// Edge colors map to the semantic palette (resolved as CSS vars in the themed app).
 const EDGE_COLOR: Record<EdgeCondition, string> = {
-  success: "#16a34a",
-  failure: "#dc2626",
-  always: "#64748b",
+  success: "var(--success)",
+  failure: "var(--failed)",
+  always: "var(--muted-foreground)",
 }
 
-/** Convert a stored FlowDefinition into React Flow nodes/edges. */
+/** Convert a stored FlowDefinition into React Flow nodes/edges (custom "tempo" node). */
 export function toReactFlow(def: FlowDefinition): {
   nodes: Node<FlowNodeData>[]
   edges: Edge[]
 } {
   const nodes: Node<FlowNodeData>[] = def.nodes.map((n) => ({
     id: n.id,
+    type: "tempo",
     position: { x: 0, y: 0 },
     data: { label: n.name, executor: n.executor.type },
-    // Theme-aware styling (Tailwind preflight resets React Flow's defaults, and
-    // the dark theme would otherwise render white text on a white node).
-    style: {
-      background: "var(--card)",
-      color: "var(--card-foreground)",
-      border: "1px solid var(--border)",
-      borderRadius: "var(--radius)",
-    },
   }))
   const edges: Edge[] = def.edges.map((e) => ({
     id: e.id,
     source: e.source,
     target: e.target,
+    type: "smoothstep",
     label: e.on,
-    style: { stroke: EDGE_COLOR[e.on] },
-    animated: e.on === "always",
+    style: { stroke: EDGE_COLOR[e.on], strokeWidth: 1.5 },
   }))
   return layout(nodes, edges)
 }
@@ -79,9 +75,9 @@ export function layout(
 ): { nodes: Node<FlowNodeData>[]; edges: Edge[] } {
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: "LR", nodesep: 40, ranksep: 80 })
-  const W = 180
-  const H = 48
+  g.setGraph({ rankdir: "LR", nodesep: 48, ranksep: 96 })
+  const W = 208
+  const H = 60
   for (const n of nodes) g.setNode(n.id, { width: W, height: H })
   for (const e of edges) g.setEdge(e.source, e.target)
   dagre.layout(g)
