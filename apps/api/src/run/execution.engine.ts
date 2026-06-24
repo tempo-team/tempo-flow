@@ -66,6 +66,8 @@ export interface NodeRunRecorder {
       response?: unknown
       output?: unknown
       errorMessage?: string
+      /** When set, refreshes the WAITING_CALLBACK timeout (executor-driven suspend). */
+      callbackDeadline?: Date
     },
   ): Promise<void>
   /** Emit a live log line for a node (best-effort, fire-and-forget). */
@@ -381,14 +383,27 @@ export class ExecutionEngine {
       const request = maskValues(result.request, sensitive)
       const response = maskValues(result.response, sensitive)
 
-      if (completionMode === "callback" && result.ok) {
-        // Trigger accepted — suspend until the external job reports completion.
+      // Suspend the node into WAITING_CALLBACK when either (a) it runs in callback
+      // completion mode and the trigger was accepted, or (b) the executor itself
+      // requested suspension (durable agent loop: tool sub-flows are running). In
+      // both cases successors stay gated and the worker is released until a resume.
+      if (result.ok && (completionMode === "callback" || result.suspend)) {
         span.setAttribute("tempo.waiting_callback", true)
+        // callback mode set its deadline at claim time; an executor-driven suspend
+        // (agent loop) sets one here so the SLA watchdog can still time it out.
+        const suspendDeadline =
+          completionMode === "callback"
+            ? undefined
+            : new Date(
+                this.now() +
+                  (node.callbackTimeoutMs ?? node.timeoutMs ?? DEFAULT_CALLBACK_TIMEOUT_MS),
+              )
         await recorder.updateNodeRun(claimed.id, {
           status: RunStatus.WaitingCallback,
           attempt,
           request,
           response,
+          callbackDeadline: suspendDeadline,
         })
         span.end()
         return

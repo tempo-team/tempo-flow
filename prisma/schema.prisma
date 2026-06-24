@@ -190,6 +190,29 @@ model NodeRun {
   @@index([status, callbackDeadline])
 }
 
+// Durable agentic LLM loop state (Phase 5). A tool-using LLM node persists its
+// conversation here so it can suspend (WAITING_CALLBACK) while tool sub-flows run
+// and resume across worker restarts without re-billing turns or re-running tools.
+model LlmAgentState {
+  id           String   @id @default(cuid())
+  flowRunId    String
+  nodeId       String
+  mapIndex     Int      @default(0)
+  status       String // WAITING_TOOLS | RUNNING_TURN | DONE
+  turn         Int      @default(0)
+  messages     String // JSON: provider message history (Anthropic MessageParam[])
+  pendingTools String? // JSON: [{ toolUseId, toolName, childRunId?, error? }]
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  model        String?
+  system       String? // resolved system prompt, reused across turns
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([flowRunId, nodeId, mapIndex])
+  @@index([flowRunId, status])
+}
+
 model SystemSetting {
   key   String @id
   value String // JSON payload (e.g. notification channel config, encrypted secrets)

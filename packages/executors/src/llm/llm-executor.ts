@@ -4,7 +4,7 @@
 import type { FlowNode, LlmExecutorConfig, LlmProvider } from "@tempo-flow/shared-types"
 import type { ExecResult, JobExecutor, RunContext } from "../executor.js"
 import { interpolateExpr } from "../params.js"
-import type { LlmClient, LlmTool } from "./llm-client.js"
+import type { LlmClient } from "./llm-client.js"
 
 /** Standard secret name holding each provider's API key. */
 const DEFAULT_KEY_SECRET: Record<LlmProvider, string> = {
@@ -13,31 +13,39 @@ const DEFAULT_KEY_SECRET: Record<LlmProvider, string> = {
   gemini: "GEMINI_API_KEY",
 }
 
-/**
- * Runs a tool's sub-flow and returns its result to the model. Injected from the
- * API layer (which owns the run launcher); the executor package stays free of
- * NestJS/Prisma deps.
- */
-export type SubflowRunner = (args: {
-  flowId: string
-  input: unknown
+/** Resolved inputs for the first turn of a durable agent loop. */
+export interface AgentStartInput {
+  node: FlowNode
   ctx: RunContext
-}) => Promise<unknown>
+  model: string
+  system?: string
+  prompt: string
+  apiKey: string
+}
+
+/**
+ * Drives the first turn of a durable agentic tool loop. Injected from the API
+ * layer (which owns Prisma + the run launcher to persist conversation state and
+ * launch tool sub-flows); the executor package stays free of NestJS/Prisma deps.
+ * Returns `{ suspend: true }` while tool sub-flows run, or a terminal result.
+ */
+export type AgentStart = (input: AgentStartInput) => Promise<ExecResult>
 
 /**
  * Calls an LLM (Claude / OpenAI / Gemini) as a node. `system` and `prompt` are
  * resolved as `={{ }}` expressions (so they can reference upstream outputs, the
  * fan-out item, params, and secrets). With an `outputSchema` the model returns
- * structured JSON, which becomes NodeRun.output for downstream chaining. The API
- * key is pulled from the secret store and never recorded.
+ * structured JSON, which becomes NodeRun.output for downstream chaining. When
+ * `tools` are configured (Anthropic only) the node delegates to the durable agent
+ * driver. The API key is pulled from the secret store and never recorded.
  */
 export class LlmExecutor implements JobExecutor {
   readonly type = "llm" as const
 
   constructor(
     private readonly clients: Partial<Record<LlmProvider, LlmClient>>,
-    /** Runs a tool's sub-flow. Required for agentic (tools) nodes. */
-    private readonly subflowRunner?: SubflowRunner,
+    /** Starts the durable agent loop for tool-using nodes. Required for tools. */
+    private readonly agentStart?: AgentStart,
   ) {}
 
   async execute(node: FlowNode, ctx: RunContext): Promise<ExecResult> {
@@ -53,8 +61,8 @@ export class LlmExecutor implements JobExecutor {
       if (provider !== "anthropic") {
         return { ok: false, errorMessage: `Tool use is only supported for provider "anthropic"` }
       }
-      if (!this.subflowRunner) {
-        return { ok: false, errorMessage: "Tool use requires a subflow runner (not configured)" }
+      if (!this.agentStart) {
+        return { ok: false, errorMessage: "Tool use requires the agent driver (not configured)" }
       }
     }
 
@@ -79,28 +87,14 @@ export class LlmExecutor implements JobExecutor {
     }
 
     const model = cfg.model ?? client.defaultModel
+
+    // Tool-using nodes run as a durable, suspendable agent loop (driver-owned).
+    if (tools.length > 0) {
+      // biome-ignore lint/style/noNonNullAssertion: guarded above when tools present
+      return this.agentStart!({ node, ctx, model, system, prompt, apiKey })
+    }
+
     const request = requestOf(cfg, model)
-
-    const llmTools: LlmTool[] | undefined =
-      tools.length > 0
-        ? tools.map((t) => ({
-            name: t.name,
-            description: t.description,
-            inputSchema: t.inputSchema,
-          }))
-        : undefined
-    const runTool =
-      tools.length > 0
-        ? async (name: string, input: unknown): Promise<unknown> => {
-            const tool = tools.find((t) => t.name === name)
-            // Throw (not return) so the adapter marks the tool_result is_error,
-            // giving the model a clear failure signal instead of a silent object.
-            if (!tool) throw new Error(`Unknown tool "${name}"`)
-            // biome-ignore lint/style/noNonNullAssertion: guarded above when tools present
-            return this.subflowRunner!({ flowId: tool.flowId, input, ctx })
-          }
-        : undefined
-
     try {
       const result = await client.complete({
         apiKey,
@@ -110,28 +104,12 @@ export class LlmExecutor implements JobExecutor {
         maxTokens: cfg.maxTokens,
         effort: cfg.effort,
         outputSchema: cfg.outputSchema,
-        tools: llmTools,
-        runTool,
-        maxToolTurns: cfg.maxToolTurns,
         onLog: ctx.onLog,
       })
-      const response = { model: result.model, usage: result.usage }
-      // An agentic loop that exhausted its turn budget produced no final answer —
-      // fail the node rather than record an empty success.
-      if (result.incomplete) {
-        return {
-          ok: false,
-          request,
-          response,
-          errorMessage: `Tool loop did not finish within ${cfg.maxToolTurns ?? 5} turns`,
-        }
-      }
       return {
         ok: true,
         request,
-        response,
-        // Prefer structured output when the model produced it; fall back to text
-        // (e.g. tool loops don't force a schema, so structured may be absent).
+        response: { model: result.model, usage: result.usage },
         output: result.structured !== undefined ? result.structured : { text: result.text },
       }
     } catch (err) {

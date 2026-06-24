@@ -48,6 +48,14 @@ export interface ExecResult {
   /** Structured result for downstream consumption (recorded into NodeRun.output). */
   output?: unknown
   errorMessage?: string
+  /**
+   * The executor triggered external work and wants the node SUSPENDED rather
+   * than finalized: the engine moves it to WAITING_CALLBACK (successors gate, the
+   * worker is released) until something resumes the run. Used by the durable
+   * agent loop, which suspends while its tool sub-flows run. Honored only when
+   * `ok` is true; ignored on failure.
+   */
+  suspend?: boolean
 }
 
 /** A pluggable execution backend (HTTP, Kubernetes, ...). */

@@ -12,6 +12,10 @@ export interface FlowRunFinishedEvent {
   flowName: string
   flowRunId: string
   status: RunStatus
+  /** Set when this run was launched as another run's child (sub-flow / agent tool). */
+  parentRunId?: string | null
+  /** How the run was triggered (e.g. "agent-tool" resumes its parent agent loop). */
+  trigger?: string
 }
 
 @Injectable()

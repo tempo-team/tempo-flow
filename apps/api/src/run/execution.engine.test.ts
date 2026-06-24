@@ -161,6 +161,58 @@ describe("ExecutionEngine.advance", () => {
     expect(rows.get("b:0")?.status).toBe(RunStatus.Success)
   })
 
+  it("suspends a node when the executor requests it (durable agent loop)", async () => {
+    const def: FlowDefinition = {
+      nodes: [node("a"), node("b")],
+      edges: [{ id: "e1", source: "a", target: "b", on: "success" }],
+    }
+    const { rec, rows } = recorder()
+    // Capture the patch so we can assert a watchdog deadline was set on suspend.
+    let suspendPatch: { callbackDeadline?: Date } | undefined
+    const orig = rec.updateNodeRun
+    rec.updateNodeRun = async (id, patch) => {
+      if (patch.status === RunStatus.WaitingCallback) suspendPatch = patch
+      return orig(id, patch)
+    }
+    // "a" asks to suspend (triggered tool sub-flows); "b" is a normal sync node.
+    const suspendExec: JobExecutor = {
+      type: "http",
+      async execute(n) {
+        if (n.id === "a") return { ok: true, suspend: true, response: { launched: true } }
+        return { ok: true, output: { ok: true } }
+      },
+    }
+    const engine = new ExecutionEngine(
+      { http: suspendExec },
+      { sleep: async () => {}, callbackBaseUrl: "https://host", now: () => 1000 },
+    )
+    const first = await engine.advance(args(rec, def))
+    expect(first).toEqual({ waiting: true, status: RunStatus.Running })
+    expect(rows.get("a:0")?.status).toBe(RunStatus.WaitingCallback)
+    expect(rows.has("b:0")).toBe(false) // successor gated
+    expect(suspendPatch?.callbackDeadline).toBeInstanceOf(Date) // watchdog can time it out
+
+    rows.get("a:0")!.status = RunStatus.Success // driver finishes the agent turn
+    const second = await engine.advance(args(rec, def))
+    expect(second).toEqual({ waiting: false, status: RunStatus.Success })
+    expect(rows.get("b:0")?.status).toBe(RunStatus.Success)
+  })
+
+  it("does not suspend on suspend:true when the result failed", async () => {
+    const def: FlowDefinition = { nodes: [node("a")], edges: [] }
+    const { rec, rows } = recorder()
+    const failExec: JobExecutor = {
+      type: "http",
+      async execute() {
+        return { ok: false, suspend: true, errorMessage: "boom" }
+      },
+    }
+    const engine = new ExecutionEngine({ http: failExec }, { sleep: async () => {} })
+    const res = await engine.advance(args(rec, def))
+    expect(res).toEqual({ waiting: false, status: RunStatus.Failed })
+    expect(rows.get("a:0")?.status).toBe(RunStatus.Failed)
+  })
+
   // --- fan-out -----------------------------------------------------------
 
   it("fans out over an array: one instance per item, then the successor runs", async () => {

@@ -137,54 +137,52 @@ describe("LlmExecutor", () => {
       maxToolTurns: 3,
     }
 
-    it("forwards tools and a runTool that dispatches to the subflow runner", async () => {
-      const { client, seen } = fakeClient()
-      const calls: { flowId: string; input: unknown }[] = []
-      const exec = new LlmExecutor({ anthropic: client }, async ({ flowId, input }) => {
-        calls.push({ flowId, input })
-        return { status: "SUCCESS" }
-      })
-      const result = await exec.execute(node(toolCfg), ctx())
-      expect(result.ok).toBe(true)
-      expect(seen[0].tools).toEqual([
-        { name: "lookup", description: "look something up", inputSchema: { type: "object" } },
-      ])
-      expect(seen[0].maxToolTurns).toBe(3)
-      // The runTool wired into the request routes by tool name → flowId.
-      const out = await seen[0].runTool?.("lookup", { q: "hi" })
-      expect(out).toEqual({ status: "SUCCESS" })
-      expect(calls).toEqual([{ flowId: "flow-tool", input: { q: "hi" } }])
-      expect(result.request).toMatchObject({ tools: 1 })
-    })
-
-    it("throws from runTool for an unknown tool name (surfaces as is_error)", async () => {
-      const { client, seen } = fakeClient()
-      const exec = new LlmExecutor({ anthropic: client }, async () => ({ status: "SUCCESS" }))
-      await exec.execute(node(toolCfg), ctx())
-      await expect(seen[0].runTool?.("nope", {})).rejects.toThrow(/nope/)
-    })
-
-    it("fails the node when the tool loop is incomplete (hit max turns)", async () => {
-      const { client } = fakeClient({ text: "", incomplete: true })
-      const exec = new LlmExecutor({ anthropic: client }, async () => ({ status: "SUCCESS" }))
-      const result = await exec.execute(node(toolCfg), ctx())
-      expect(result.ok).toBe(false)
-      expect(result.errorMessage).toMatch(/did not finish/)
-      // usage is still recorded for cost observability
-      expect(result.response).toMatchObject({ usage: { inputTokens: 10, outputTokens: 5 } })
-    })
-
-    it("fails when tools are set but no subflow runner is configured", async () => {
+    it("delegates a tools node to the agent driver with resolved inputs", async () => {
       const { client } = fakeClient()
-      const exec = new LlmExecutor({ anthropic: client }) // no runner
+      const seen: unknown[] = []
+      const exec = new LlmExecutor({ anthropic: client }, async (input) => {
+        seen.push(input)
+        return { ok: true, suspend: true, request: { tools: 1 } }
+      })
+      const result = await exec.execute(
+        node({ ...toolCfg, prompt: "Summarize ={{ nodes.fetch.output.text }}" }),
+        ctx({ nodeOutputs: { fetch: { output: { text: "a report" } } } }),
+      )
+      // The driver's ExecResult (suspend) is returned to the engine verbatim.
+      expect(result).toMatchObject({ ok: true, suspend: true })
+      expect(seen[0]).toMatchObject({
+        model: "claude-opus-4-8",
+        prompt: "Summarize a report", // ={{ }} resolved before delegation
+        apiKey: "sk-test",
+      })
+    })
+
+    it("fails when tools are set but no agent driver is configured", async () => {
+      const { client } = fakeClient()
+      const exec = new LlmExecutor({ anthropic: client }) // no driver
       const result = await exec.execute(node(toolCfg), ctx())
       expect(result.ok).toBe(false)
-      expect(result.errorMessage).toMatch(/subflow runner/i)
+      expect(result.errorMessage).toMatch(/agent driver/i)
+    })
+
+    it("fails a tools node with a missing API key before delegating", async () => {
+      const { client } = fakeClient()
+      let called = false
+      const exec = new LlmExecutor({ anthropic: client }, async () => {
+        called = true
+        return { ok: true }
+      })
+      const result = await exec.execute(node(toolCfg), ctx({ secrets: {} }))
+      expect(result.ok).toBe(false)
+      expect(result.errorMessage).toMatch(/ANTHROPIC_API_KEY/)
+      expect(called).toBe(false)
     })
 
     it("rejects tool use for non-anthropic providers", async () => {
       const openai: LlmClient = { ...fakeClient().client, provider: "openai" }
-      const exec = new LlmExecutor({ anthropic: fakeClient().client, openai }, async () => ({}))
+      const exec = new LlmExecutor({ anthropic: fakeClient().client, openai }, async () => ({
+        ok: true,
+      }))
       const result = await exec.execute(
         node({ ...toolCfg, provider: "openai" }),
         ctx({ secrets: { OPENAI_API_KEY: "k" } }),

@@ -8,7 +8,14 @@ import { PrismaService } from "../prisma/prisma.service"
 import { QueueService } from "../queue/queue.service"
 
 /** Where a run came from. Stored verbatim in FlowRun.trigger. */
-export type RunTriggerSource = "manual" | "schedule" | "webhook" | "event" | "backfill" | "subflow"
+export type RunTriggerSource =
+  | "manual"
+  | "schedule"
+  | "webhook"
+  | "event"
+  | "backfill"
+  | "subflow"
+  | "agent-tool"
 
 export interface LaunchInput {
   flowId: string

@@ -7,15 +7,12 @@ import { ConfigService } from "@nestjs/config"
 import { EventEmitter2 } from "@nestjs/event-emitter"
 import { Prisma } from "@prisma/client"
 import {
-  AnthropicClient,
   DefaultK8sJobRunner,
   DockerScriptRunner,
-  GeminiClient,
   HttpExecutor,
   type JobExecutor,
   K8sExecutor,
   LlmExecutor,
-  OpenAiClient,
   ScriptExecutor,
 } from "@tempo-flow/executors"
 import {
@@ -32,8 +29,8 @@ import { FLOW_RUN_FINISHED, type FlowRunFinishedEvent } from "../notification/no
 import { PrismaService } from "../prisma/prisma.service"
 import { SecretService } from "../secret/secret.service"
 import { ExecutionEngine, type NodeRunRecorder } from "./execution.engine"
+import { LlmAgentService } from "./llm-agent.service"
 import { RunLauncherService } from "./run-launcher.service"
-import { makeSubflowToolRunner } from "./subflow-tool-runner"
 import { SubflowExecutor } from "./subflow.executor"
 import type { ManualRunRequest } from "./dto/run.request"
 
@@ -54,6 +51,7 @@ export class RunService implements NodeRunRecorder {
     private readonly runEvents: RunEventsService,
     private readonly config: ConfigService,
     private readonly secrets: SecretService,
+    private readonly agentService: LlmAgentService,
   ) {
     // K8s runner lazily loads kube config on first use, so constructing it here
     // does not require a cluster to be reachable at boot.
@@ -66,16 +64,9 @@ export class RunService implements NodeRunRecorder {
         new DockerScriptRunner(this.config.get<string>("DOCKER_PATH") ?? "docker"),
       ),
       // LLM nodes call Claude/OpenAI/Gemini; API keys come from the secret store.
-      // Default models are overridable via env and per-node `model`. The subflow
-      // tool runner turns agentic tool calls into child flow runs.
-      llm: new LlmExecutor(
-        {
-          anthropic: new AnthropicClient(),
-          openai: new OpenAiClient(undefined, this.config.get<string>("OPENAI_DEFAULT_MODEL")),
-          gemini: new GeminiClient(undefined, this.config.get<string>("GEMINI_DEFAULT_MODEL")),
-        },
-        makeSubflowToolRunner(this.launcher, this.prisma),
-      ),
+      // Default models are overridable via env and per-node `model`. Tool-using
+      // (agentic) nodes delegate to LlmAgentService for a durable, suspendable loop.
+      llm: new LlmExecutor(this.agentService.clients, (input) => this.agentService.start(input)),
     }
     // Base URL handed to callback-mode jobs so they can report completion.
     const callbackBaseUrl = this.config.get<string>("PUBLIC_URL") ?? "http://localhost:3000"
@@ -195,6 +186,11 @@ export class RunService implements NodeRunRecorder {
       })
     }
 
+    // Advance any suspended durable agent loops whose tool sub-flows have finished
+    // (feeds tool results back, runs the next turn) before the engine advances the
+    // DAG frontier — a no-op when this run has no agent nodes waiting.
+    await this.agentService.continue(flowRunId)
+
     // Decrypted secrets are injected into node executions (env / `secrets.*`
     // expressions) and masked out of recorded requests — never persisted plain.
     const secrets = await this.secrets.resolveForFlow(run.flowId)
@@ -249,6 +245,8 @@ export class RunService implements NodeRunRecorder {
       flowName: run.flow.name,
       flowRunId,
       status: result.status,
+      parentRunId: run.parentRunId,
+      trigger: run.trigger,
     }
     this.events.emit(FLOW_RUN_FINISHED, event)
     return result.status
@@ -342,6 +340,7 @@ export class RunService implements NodeRunRecorder {
       response?: unknown
       output?: unknown
       errorMessage?: string
+      callbackDeadline?: Date
     },
   ): Promise<void> {
     const row = await this.prisma.nodeRun.update({
@@ -355,6 +354,10 @@ export class RunService implements NodeRunRecorder {
         errorMessage: patch.errorMessage,
         // A node awaiting its callback is not finished yet.
         finishedAt: isTerminal(patch.status) ? new Date() : null,
+        // Only touch the deadline when provided (executor-driven suspend refresh).
+        ...(patch.callbackDeadline !== undefined
+          ? { callbackDeadline: patch.callbackDeadline }
+          : {}),
       },
     })
     await this.runEvents.publish({

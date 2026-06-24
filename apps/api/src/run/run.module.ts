@@ -7,6 +7,7 @@ import { JwtModule } from "@nestjs/jwt"
 import { QueueModule } from "../queue/queue.module"
 import { SecretModule } from "../secret/secret.module"
 import { FlowProcessor } from "./flow.processor"
+import { LlmAgentService } from "./llm-agent.service"
 import { RunController } from "./run.controller"
 import { RunLauncherModule } from "./run-launcher.module"
 import { RunStreamController } from "./run-stream.controller"
@@ -26,7 +27,7 @@ import { SseAuthGuard } from "./sse-auth.guard"
     }),
   ],
   controllers: [RunController, RunStreamController],
-  providers: [RunService, FlowProcessor, SseAuthGuard],
+  providers: [RunService, LlmAgentService, FlowProcessor, SseAuthGuard],
   exports: [RunService],
 })
 export class RunModule {}

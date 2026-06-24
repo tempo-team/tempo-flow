@@ -10,12 +10,6 @@ export interface LlmTool {
   inputSchema: Record<string, unknown>
 }
 
-/**
- * Executes a tool the model asked for and returns the result fed back to it.
- * In tempo-flow this runs the tool's sub-flow and returns its node outputs.
- */
-export type ToolRunner = (name: string, input: unknown) => Promise<unknown>
-
 /** A single model completion request, provider-agnostic. */
 export interface LlmRequest {
   apiKey: string
@@ -26,12 +20,6 @@ export interface LlmRequest {
   effort?: "low" | "medium" | "high"
   /** JSON Schema — when set, the provider is forced to return matching JSON. */
   outputSchema?: Record<string, unknown>
-  /** Tools the model may call. When set with `runTool`, the adapter runs an agentic loop. */
-  tools?: LlmTool[]
-  /** Invoked when the model calls a tool; its result is returned to the model. */
-  runTool?: ToolRunner
-  /** Max tool-calling turns before stopping (default 5). */
-  maxToolTurns?: number
   /** Stream progress lines (best-effort). */
   onLog?: (line: string) => void
 }
@@ -43,23 +31,52 @@ export interface LlmResult {
   structured?: unknown
   model: string
   usage: { inputTokens: number; outputTokens: number }
-  /**
-   * True when an agentic tool loop stopped without the model finishing (hit the
-   * turn cap). The executor treats this as a node failure rather than a silent
-   * empty success.
-   */
-  incomplete?: boolean
+}
+
+/**
+ * One turn of an agentic tool loop. The conversation `messages` are provider-
+ * native and shuttled verbatim by the durable agent driver (persisted between
+ * turns), so the loop survives worker restarts. Anthropic-only for now.
+ */
+export interface LlmStepRequest {
+  apiKey: string
+  model: string
+  system?: string
+  /** Provider-native message history (e.g. Anthropic MessageParam[]). */
+  messages: unknown[]
+  tools: LlmTool[]
+  maxTokens?: number
+  effort?: "low" | "medium" | "high"
+  onLog?: (line: string) => void
+}
+
+/** Result of a single agentic turn. */
+export interface LlmStep {
+  /** The assistant message content to append to the conversation verbatim. */
+  assistantContent: unknown
+  /** Tools the model asked to run this turn (empty when it finished). */
+  toolUses: { id: string; name: string; input: unknown }[]
+  /** Final assistant text (meaningful when `done`). */
+  text: string
+  /** True when the model stopped without requesting tools. */
+  done: boolean
+  model: string
+  usage: { inputTokens: number; outputTokens: number }
 }
 
 /**
  * Pluggable model backend. One adapter per provider (Anthropic, OpenAI, Gemini),
  * all sharing this contract so the LLM executor can route by config alone.
+ * `stepTools` (one agentic turn) is optional — only providers that support the
+ * durable tool loop implement it.
  */
 export interface LlmClient {
   readonly provider: LlmProvider
   /** Default model when the node doesn't specify one. */
   readonly defaultModel: string
   complete(req: LlmRequest): Promise<LlmResult>
+  /** One agentic turn over a persisted conversation (durable tool loop). */
+  stepTools?(req: LlmStepRequest): Promise<LlmStep>
 }
 
 /** Parse a model's text output as JSON, returning undefined on failure. */
