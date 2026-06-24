@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Anthropic from "@anthropic-ai/sdk"
-import type { LlmClient, LlmRequest, LlmResult } from "./llm-client.js"
+import { type LlmClient, type LlmRequest, type LlmResult, tryParseJson } from "./llm-client.js"
 
 const DEFAULT_MODEL = "claude-opus-4-8"
 const DEFAULT_MAX_TOKENS = 8192
@@ -57,17 +57,9 @@ export class AnthropicClient implements LlmClient {
 
     return {
       text,
-      structured: req.outputSchema ? safeParse(text) : undefined,
+      structured: req.outputSchema ? tryParseJson(text) : undefined,
       model: res.model,
       usage: { inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens },
     }
-  }
-}
-
-function safeParse(text: string): unknown {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return undefined
   }
 }

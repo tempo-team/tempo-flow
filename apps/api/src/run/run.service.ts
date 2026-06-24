@@ -10,10 +10,12 @@ import {
   AnthropicClient,
   DefaultK8sJobRunner,
   DockerScriptRunner,
+  GeminiClient,
   HttpExecutor,
   type JobExecutor,
   K8sExecutor,
   LlmExecutor,
+  OpenAiClient,
   ScriptExecutor,
 } from "@tempo-flow/executors"
 import {
@@ -63,7 +65,12 @@ export class RunService implements NodeRunRecorder {
         new DockerScriptRunner(this.config.get<string>("DOCKER_PATH") ?? "docker"),
       ),
       // LLM nodes call Claude/OpenAI/Gemini; API keys come from the secret store.
-      llm: new LlmExecutor({ anthropic: new AnthropicClient() }),
+      // Default models are overridable via env and per-node `model`.
+      llm: new LlmExecutor({
+        anthropic: new AnthropicClient(),
+        openai: new OpenAiClient(undefined, this.config.get<string>("OPENAI_DEFAULT_MODEL")),
+        gemini: new GeminiClient(undefined, this.config.get<string>("GEMINI_DEFAULT_MODEL")),
+      }),
     }
     // Base URL handed to callback-mode jobs so they can report completion.
     const callbackBaseUrl = this.config.get<string>("PUBLIC_URL") ?? "http://localhost:3000"

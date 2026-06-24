@@ -4,6 +4,7 @@ packages:
 overrides:
   ioredis: "^5.11.1"
 allowBuilds:
+  "@google/genai": false
   "@nestjs/core": true
   "@prisma/client": true
   "@prisma/engines": true

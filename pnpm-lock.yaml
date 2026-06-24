@@ -277,6 +277,9 @@ importers:
       "@anthropic-ai/sdk":
         specifier: ^0.105.0
         version: 0.105.0(zod@4.4.3)
+      "@google/genai":
+        specifier: ^2.9.0
+        version: 2.9.0
       "@kubernetes/client-node":
         specifier: ^1.4.0
         version: 1.4.0
@@ -289,6 +292,9 @@ importers:
       jsonata:
         specifier: ^2.2.1
         version: 2.2.1
+      openai:
+        specifier: ^6.44.0
+        version: 6.44.0(ws@8.21.0)(zod@4.4.3)
 
   packages/flow-engine:
     dependencies:
@@ -1453,6 +1459,18 @@ packages:
       {
         integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==,
       }
+
+  "@google/genai@2.9.0":
+    resolution:
+      {
+        integrity: sha512-3DRdSJ0LaKFig3FNGeRDn9BQxtjZm2qr0hNH2d771LKcG0HvUYddlN0LPdSp8XU7Ekb04i9q3+tt64uYqavUdw==,
+      }
+    engines: { node: ">=20.0.0" }
+    peerDependencies:
+      "@modelcontextprotocol/sdk": ^1.25.2
+    peerDependenciesMeta:
+      "@modelcontextprotocol/sdk":
+        optional: true
 
   "@grammyjs/types@3.28.0":
     resolution:
@@ -4166,6 +4184,12 @@ packages:
         integrity: sha512-MXfmqaVPEVgkBT/aY0aGCkRWWtByiYQXo3xdQ8r5RzuFrPiRn8Gar2tQdXSUQ2GKV3bkXckek89V8wQBY2Q/Aw==,
       }
 
+  "@types/retry@0.12.0":
+    resolution:
+      {
+        integrity: sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==,
+      }
+
   "@types/send@1.2.1":
     resolution:
       {
@@ -6251,6 +6275,20 @@ packages:
       }
     engines: { node: ">=18" }
 
+  gaxios@7.1.5:
+    resolution:
+      {
+        integrity: sha512-5FZy72Rh8LhtjmvDrKkI+lVhrsQrVKVsItxMoDm5mNQE+xR0WVIIs+jzPSJgBvKVsLi24fZhXJIsNI0bihDzFg==,
+      }
+    engines: { node: ">=18" }
+
+  gcp-metadata@8.1.2:
+    resolution:
+      {
+        integrity: sha512-zV/5HKTfCeKWnxG0Dmrw51hEWFGfcF2xiXqcA3+J90WDuP0SvoiSO5ORvcBsifmx/FoIjgQN3oNOGaQ5PhLFkg==,
+      }
+    engines: { node: ">=18" }
+
   gcp-metadata@8.1.3:
     resolution:
       {
@@ -6362,6 +6400,13 @@ packages:
       {
         integrity: sha512-uHJgbwAMwNFf5mLst7IWLNg14x1CkeqglJb/K3doi4dw6q2IvAAmM/Y81kevy83wP+Sst+nutFTYOGg3d1lsxg==,
       }
+
+  google-auth-library@10.7.0:
+    resolution:
+      {
+        integrity: sha512-QpTAbNJ36TliZLx3TTtahR8HG0hN9RllL1e3FymOvQSIKK8JmgV58H924ub2wa2DsS3ANjjP1Aw1N+Ramc8hqQ==,
+      }
+    engines: { node: ">=18" }
 
   google-logging-utils@1.1.3:
     resolution:
@@ -7527,6 +7572,20 @@ packages:
       }
     engines: { node: ">=18" }
 
+  openai@6.44.0:
+    resolution:
+      {
+        integrity: sha512-09/gH+8jH0RgUwsgWHAaxsKGRT5zVZ95IaJUnqAWj6XejIBmnFRwq2WUIF37VtDEsmGrtPmvCs5+yBSeZGWvkA==,
+      }
+    peerDependencies:
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      ws:
+        optional: true
+      zod:
+        optional: true
+
   openid-client@6.8.4:
     resolution:
       {
@@ -7567,6 +7626,13 @@ packages:
         integrity: sha512-LaNjtRWUBY++zB5nE/NwcaoMylSPk+S+ZHNB1TzdbMJMny6dynpAGt7X/tl/QYq3TIeE6nxHppbo2LGymrG5Pw==,
       }
     engines: { node: ">=10" }
+
+  p-retry@4.6.2:
+    resolution:
+      {
+        integrity: sha512-312Id396EbJdvRONlngUx0NydfrIQ5lsYu0znKVUzVvArzEIt08V1qhtyESbGVd1FGX7UKtiFp5uwKZdM8wIuQ==,
+      }
+    engines: { node: ">=8" }
 
   package-json-from-dist@1.0.1:
     resolution:
@@ -8105,6 +8171,13 @@ packages:
         integrity: sha512-oMA2dcrw6u0YfxJQXm342bFKX/E4sG9rbTzO9ptUcR/e8A33cHuvStiYOwH7fszkZlZ1z/ta9AAoPk2F4qIOHA==,
       }
     engines: { node: ">=18" }
+
+  retry@0.13.1:
+    resolution:
+      {
+        integrity: sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg==,
+      }
+    engines: { node: ">= 4" }
 
   rfc4648@1.5.4:
     resolution:
@@ -9948,6 +10021,17 @@ snapshots:
       react-dom: 19.2.7(react@19.2.7)
 
   "@floating-ui/utils@0.2.11": {}
+
+  "@google/genai@2.9.0":
+    dependencies:
+      google-auth-library: 10.7.0
+      p-retry: 4.6.2
+      protobufjs: 7.6.4
+      ws: 8.21.0
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
 
   "@grammyjs/types@3.28.0": {}
 
@@ -12064,6 +12148,8 @@ snapshots:
     dependencies:
       csstype: 3.2.3
 
+  "@types/retry@0.12.0": {}
+
   "@types/send@1.2.1":
     dependencies:
       "@types/node": 22.19.21
@@ -13464,6 +13550,22 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  gaxios@7.1.5:
+    dependencies:
+      extend: 3.0.2
+      https-proxy-agent: 7.0.6
+      node-fetch: 3.3.2
+    transitivePeerDependencies:
+      - supports-color
+
+  gcp-metadata@8.1.2:
+    dependencies:
+      gaxios: 7.1.3
+      google-logging-utils: 1.1.3
+      json-bigint: 1.0.0
+    transitivePeerDependencies:
+      - supports-color
+
   gcp-metadata@8.1.3:
     dependencies:
       gaxios: 7.1.3
@@ -13541,6 +13643,17 @@ snapshots:
   globals@14.0.0: {}
 
   globrex@0.1.2: {}
+
+  google-auth-library@10.7.0:
+    dependencies:
+      base64-js: 1.5.1
+      ecdsa-sig-formatter: 1.0.11
+      gaxios: 7.1.5
+      gcp-metadata: 8.1.2
+      google-logging-utils: 1.1.3
+      jws: 4.0.1
+    transitivePeerDependencies:
+      - supports-color
 
   google-logging-utils@1.1.3: {}
 
@@ -14135,6 +14248,11 @@ snapshots:
     dependencies:
       mimic-function: 5.0.1
 
+  openai@6.44.0(ws@8.21.0)(zod@4.4.3):
+    optionalDependencies:
+      ws: 8.21.0
+      zod: 4.4.3
+
   openid-client@6.8.4:
     dependencies:
       jose: 6.2.3
@@ -14170,6 +14288,11 @@ snapshots:
   p-locate@5.0.0:
     dependencies:
       p-limit: 3.1.0
+
+  p-retry@4.6.2:
+    dependencies:
+      "@types/retry": 0.12.0
+      retry: 0.13.1
 
   package-json-from-dist@1.0.1: {}
 
@@ -14510,6 +14633,8 @@ snapshots:
     dependencies:
       onetime: 7.0.0
       signal-exit: 4.1.0
+
+  retry@0.13.1: {}
 
   rfc4648@1.5.4: {}
 

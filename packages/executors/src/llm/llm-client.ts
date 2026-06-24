@@ -36,3 +36,12 @@ export interface LlmClient {
   readonly defaultModel: string
   complete(req: LlmRequest): Promise<LlmResult>
 }
+
+/** Parse a model's text output as JSON, returning undefined on failure. */
+export function tryParseJson(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return undefined
+  }
+}

@@ -14,6 +14,8 @@ export * from "./script-executor.js"
 export * from "./docker-script-runner.js"
 export * from "./llm/llm-client.js"
 export * from "./llm/anthropic-client.js"
+export * from "./llm/openai-client.js"
+export * from "./llm/gemini-client.js"
 export * from "./llm/llm-executor.js"
 
 export const EXECUTORS_VERSION = "0.0.0"
