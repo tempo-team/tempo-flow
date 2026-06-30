@@ -183,9 +183,7 @@ export function FlowPage() {
 
       {can("edit", "flow") && <WebhookPanel flowId={flow.id} />}
       {can("edit", "flow") && <EventTriggerPanel flowId={flow.id} />}
-      {can("view", "flow") && (
-        <VersionHistory flowId={flow.id} onRestored={() => api.getFlow(flow.id).then(setFlow)} />
-      )}
+      {can("view", "flow") && <VersionHistory flowId={flow.id} />}
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">Runs</h2>

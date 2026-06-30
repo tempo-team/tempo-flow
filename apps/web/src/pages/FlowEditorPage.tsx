@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { CanvasMode } from "@/features/flow-editor/CanvasMode"
+import { CronBuilder } from "@/features/flow-editor/CronBuilder"
 import { FormMode } from "@/features/flow-editor/FormMode"
 import { saveFlow } from "@/features/flow-editor/save"
 import { type FlowEditorState, emptyState, stateFromFlow } from "@/features/flow-editor/state"
@@ -112,31 +113,30 @@ export function FlowEditorPage() {
               rows={2}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-1.5">
-              <Label>Trigger</Label>
-              <Select
-                value={state.triggerType}
-                onValueChange={(v) => patch({ triggerType: v as FlowEditorState["triggerType"] })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manual">Manual</SelectItem>
-                  <SelectItem value="cron">Cron (second-level)</SelectItem>
-                </SelectContent>
-              </Select>
+          <div className="grid gap-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label>Trigger</Label>
+                <Select
+                  value={state.triggerType}
+                  onValueChange={(v) => patch({ triggerType: v as FlowEditorState["triggerType"] })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="cron">Cron</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             {state.triggerType === "cron" && (
-              <div className="grid gap-1.5">
-                <Label htmlFor="cron">Cron expression</Label>
-                <Input
-                  id="cron"
+              <div className="rounded-lg border p-4">
+                <Label className="mb-3 block text-sm font-medium">Schedule</Label>
+                <CronBuilder
                   value={state.cronExpr}
-                  onChange={(e) => patch({ cronExpr: e.target.value })}
-                  placeholder="*/5 * * * * *"
-                  className="font-mono"
+                  onChange={(expr) => patch({ cronExpr: expr })}
                 />
               </div>
             )}
