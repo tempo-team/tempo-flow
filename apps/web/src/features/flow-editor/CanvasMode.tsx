@@ -18,7 +18,7 @@ import {
   applyNodeChanges,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { LayoutGrid, Plus } from "lucide-react"
+import { LayoutGrid, Plus, X } from "lucide-react"
 import { useTheme } from "next-themes"
 import type { EdgeCondition, FlowDefinition, FlowNode } from "@tempo-flow/shared-types"
 import { Button } from "@/components/ui/button"
@@ -130,6 +130,11 @@ export function CanvasMode({ definition, onChange }: Props) {
     })
   }
 
+  function removeEdge(edgeId: string): void {
+    setEdges((eds) => eds.filter((e) => e.id !== edgeId))
+    onChange({ ...definition, edges: definition.edges.filter((e) => e.id !== edgeId) })
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -140,7 +145,8 @@ export function CanvasMode({ definition, onChange }: Props) {
           <LayoutGrid className="mr-1 size-4" /> Auto layout
         </Button>
         <p className="text-xs text-muted-foreground">
-          Drag to connect nodes. Click a node to edit it. Select + Delete to remove.
+          Drag from a handle to connect nodes. Double-click a node to edit. Select + Delete to
+          remove.
         </p>
       </div>
 
@@ -152,7 +158,8 @@ export function CanvasMode({ definition, onChange }: Props) {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
-          onNodeClick={(_, node) => setSelectedNode(node.id)}
+          onNodeDoubleClick={(_, node) => setSelectedNode(node.id)}
+          connectionLineStyle={{ stroke: "var(--primary)", strokeWidth: 2 }}
           colorMode={resolvedTheme === "dark" ? "dark" : "light"}
           proOptions={{ hideAttribution: true }}
           fitView
@@ -186,6 +193,15 @@ export function CanvasMode({ definition, onChange }: Props) {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                onClick={() => removeEdge(e.id)}
+              >
+                <X className="size-3" />
+              </Button>
             </div>
           ))}
         </div>

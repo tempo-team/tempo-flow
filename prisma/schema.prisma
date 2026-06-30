@@ -15,7 +15,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // DB_PROVIDER (managed by scripts/set-db-provider.mjs)
+  provider = "mysql" // DB_PROVIDER (managed by scripts/set-db-provider.mjs)
   url      = env("DATABASE_URL")
 }
 
@@ -73,8 +73,8 @@ model Flow {
   id            String    @id @default(cuid())
   name          String
   description   String?
-  definition    String    // DAG JSON: { nodes[], edges[] } — workflow-as-data
-  trigger       String    // JSON: { type: "cron"|"manual", expr?: string }
+  definition    String    @db.Text // DAG JSON: { nodes[], edges[] } — workflow-as-data
+  trigger       String    @db.Text // JSON: { type: "cron"|"manual", expr?: string }
   enabled       Boolean   @default(true)
   overlapPolicy    String  @default("skip") // "skip" | "allow"
   slaMs            Int? // deadline from run start; exceeding it fails the run + alerts
@@ -98,8 +98,8 @@ model FlowVersion {
   version     Int
   name        String
   description String?
-  definition  String
-  trigger     String
+  definition  String   @db.Text
+  trigger     String   @db.Text
   createdBy   String?
   createdAt   DateTime @default(now())
 
@@ -152,7 +152,7 @@ model FlowRun {
   status     String // PENDING_APPROVAL | PENDING | RUNNING | SUCCESS | FAILED | CANCELED
   trigger    String // "schedule" | "manual" | "webhook" | "event" | "backfill" | "subflow"
   approval   ApprovalRequest?
-  params      String?  // JSON: resolved params (date substitution applied)
+  params      String?  @db.Text // JSON: resolved params (date substitution applied)
   parentRunId String?  // set when launched as a sub-flow node of another run
   startedAt  DateTime?
   finishedAt DateTime?
@@ -176,9 +176,9 @@ model NodeRun {
   completionMode String  @default("sync") // sync | callback
   callbackTokenHash String? @unique // sha256 of the one-time callback token
   callbackDeadline  DateTime?        // WAITING_CALLBACK fails past this instant
-  request      String?   // JSON: actual request (query/body/env)
-  response     String?   // JSON: response / exit code / log summary
-  output       String?   // JSON: callback-reported output, for downstream params
+  request      String?   @db.Text // JSON: actual request (query/body/env)
+  response     String?   @db.Text // JSON: response / exit code / log summary
+  output       String?   @db.Text // JSON: callback-reported output, for downstream params
   errorMessage String?
   startedAt    DateTime?
   finishedAt   DateTime?
@@ -200,12 +200,12 @@ model LlmAgentState {
   mapIndex     Int      @default(0)
   status       String // WAITING_TOOLS | RUNNING_TURN | DONE
   turn         Int      @default(0)
-  messages     String // JSON: provider message history (Anthropic MessageParam[])
-  pendingTools String? // JSON: [{ toolUseId, toolName, childRunId?, error? }]
+  messages     String  @db.Text // JSON: provider message history (Anthropic MessageParam[])
+  pendingTools String? @db.Text // JSON: [{ toolUseId, toolName, childRunId?, error? }]
   inputTokens  Int      @default(0)
   outputTokens Int      @default(0)
   model        String?
-  system       String? // resolved system prompt, reused across turns
+  system       String? @db.Text // resolved system prompt, reused across turns
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -215,7 +215,7 @@ model LlmAgentState {
 
 model SystemSetting {
   key   String @id
-  value String // JSON payload (e.g. notification channel config, encrypted secrets)
+  value String @db.Text // JSON payload (e.g. notification channel config, encrypted secrets)
 }
 
 /**

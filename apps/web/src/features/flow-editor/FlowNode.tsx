@@ -17,7 +17,11 @@ const EXECUTOR_ICON: Record<string, typeof Workflow> = {
   llm: Sparkles,
 }
 
-const HANDLE = "!size-2.5 !border-2 !border-background !bg-muted-foreground"
+const SOURCE_HANDLE = "!size-4 !border-2 !border-background !bg-primary cursor-crosshair"
+const TARGET_HANDLE = "!size-3 !border-0 !bg-transparent"
+
+// Inline style beats any CSS specificity battle with react-flow's stylesheet.
+const HANDLE_STYLE = { pointerEvents: "all" } as const
 
 /**
  * Custom DAG node: executor icon + title + type, with a left status stripe
@@ -30,12 +34,12 @@ export function FlowNode({ data, selected }: NodeProps<Node<FlowNodeData>>) {
   return (
     <div
       className={cn(
-        "relative w-52 overflow-hidden rounded-lg border bg-card shadow-sm transition",
+        "relative w-52 rounded-lg border bg-card shadow-sm transition",
         selected ? "border-ring ring-2 ring-ring/40" : "hover:border-muted-foreground/40",
       )}
     >
       <span
-        className={cn("absolute inset-y-0 left-0 w-1", active && "animate-pulse")}
+        className={cn("absolute inset-y-0 left-0 w-1 rounded-l-lg", active && "animate-pulse")}
         style={{ background: statusVar(data.status) }}
       />
       <div className="flex items-center gap-2 px-3 pt-2.5 pl-4">
@@ -45,8 +49,20 @@ export function FlowNode({ data, selected }: NodeProps<Node<FlowNodeData>>) {
       <div className="px-3 pb-2.5 pl-4 font-mono text-[11px] text-muted-foreground">
         {data.executor}
       </div>
-      <Handle type="target" position={Position.Left} className={HANDLE} />
-      <Handle type="source" position={Position.Right} className={HANDLE} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        className={TARGET_HANDLE}
+        isConnectable
+        style={HANDLE_STYLE}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className={SOURCE_HANDLE}
+        isConnectable
+        style={HANDLE_STYLE}
+      />
     </div>
   )
 }
