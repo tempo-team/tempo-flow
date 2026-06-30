@@ -9,6 +9,7 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0" /></a>
   <img src="https://img.shields.io/badge/TypeScript-100%25-3178c6.svg" alt="100% TypeScript" />
   <img src="https://img.shields.io/badge/self--host-docker%20compose%20up-2496ed.svg" alt="docker compose up" />
+  <a href="https://discord.gg/INVITE_CODE"><img src="https://img.shields.io/discord/SERVER_ID?label=Discord&logo=discord&logoColor=white&color=5865F2" alt="Discord" /></a>
 </p>
 
 > **The durable, 100% TypeScript workflow engine you can `docker compose up`** —
